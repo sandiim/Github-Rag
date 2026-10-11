@@ -24,6 +24,7 @@ class Repository(Base):
     full_name: Mapped[str] = mapped_column(String(512), unique=True)
     default_branch: Mapped[str] = mapped_column(String(255))
     active_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    active_index_version: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -44,6 +45,7 @@ class SourceFile(Base):
     __tablename__ = "source_files"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repositories.id"))
+    index_version: Mapped[uuid.UUID] = mapped_column()
     commit_sha: Mapped[str] = mapped_column(String(64))
     path: Mapped[str] = mapped_column(String(2048))
     content: Mapped[str] = mapped_column(Text)
@@ -81,4 +83,5 @@ class RebuildRecord(Base):
     __tablename__ = "rebuild_records"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repositories.id"))
+    index_version: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(String(32))

@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 4 complete — GitHub discovery and safe file filtering.
+Milestone 5 complete — versioned repository indexing.
 
 ## Approved Decisions
 
@@ -26,10 +26,14 @@ Milestone 4 complete — GitHub discovery and safe file filtering.
 - Added the PostgreSQL session factory and an initial Alembic migration with pgvector support.
 - Added authenticated GitHub repository parsing, default-branch/commit resolution, and recursive text-blob discovery.
 - Added an allowlist filter that excludes dependencies, generated output, lockfiles, binaries, minified files, and oversized content.
+- Added line-preserving chunks with configurable overlap and inclusive source-line ranges.
+- Added a local Ollama embedding adapter for `nomic-embed-text:latest`.
+- Added replacement index versions with atomic activation only after filtered files, chunks, and embeddings persist successfully.
+- Added unchanged-commit skipping and failed-rebuild protection that retains the previous active index.
 
 ## Next
 
-- Build line-preserving chunking, Ollama embeddings, and versioned repository indexing.
+- Build grounded retrieval, answer generation, and commit-pinned citations.
 
 ## Known Risks
 
@@ -46,3 +50,4 @@ Milestone 4 complete — GitHub discovery and safe file filtering.
 - `cd backend; python -m pytest tests/test_settings.py tests/test_health.py -q` — 2 passed
 - `cd backend; alembic upgrade head; python -m pytest tests/persistence -q` — 3 passed from a fresh PostgreSQL volume
 - `cd backend; python -m pytest tests/github/test_client.py tests/rag/test_file_filter.py -q` — 14 passed
+- `cd backend; alembic upgrade head; python -m pytest -q` — 25 passed (one upstream Starlette deprecation warning)
