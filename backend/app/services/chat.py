@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.persistence.models import Citation, Conversation, Message, Repository
@@ -61,10 +61,30 @@ class ChatService:
             self._session.add(conversation)
             self._session.flush()
 
-        self._session.add(Message(conversation_id=conversation.id, role="user", content=question))
+        next_sequence = (
+            self._session.scalar(
+                select(func.coalesce(func.max(Message.sequence), 0)).where(
+                    Message.conversation_id == conversation.id
+                )
+            )
+            + 1
+        )
+        self._session.add(
+            Message(
+                conversation_id=conversation.id,
+                sequence=next_sequence,
+                role="user",
+                content=question,
+            )
+        )
         context = self._retriever.retrieve(repository_id, question)
         text = self._generator.answer(question, context)
-        assistant_message = Message(conversation_id=conversation.id, role="assistant", content=text)
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            sequence=next_sequence + 1,
+            role="assistant",
+            content=text,
+        )
         self._session.add(assistant_message)
         self._session.flush()
 
@@ -94,4 +114,5 @@ class ChatService:
             for citation in citations
         )
         self._session.flush()
+        self._session.commit()
         return ChatAnswer(text=text, citations=citations)

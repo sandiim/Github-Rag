@@ -63,8 +63,10 @@ class Chunk(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (UniqueConstraint("conversation_id", "sequence"),)
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id"))
+    sequence: Mapped[int]
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
 

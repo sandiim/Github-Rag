@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 6 complete — grounded chat and citations.
+Milestone 7 complete — typed backend API.
 
 ## Approved Decisions
 
@@ -33,10 +33,14 @@ Milestone 6 complete — grounded chat and citations.
 - Added active-index-only vector retrieval and OpenAI-compatible grounded completion generation.
 - Added durable user and assistant messages with a repository's single persistent conversation.
 - Added commit-pinned GitHub citation URLs and persisted citation records for retrieved source chunks.
+- Added typed repository creation, listing, detail, rebuild, conversation, and chat API endpoints.
+- Added dependency injection for database, GitHub, Ollama embedding, retrieval, and completion services.
+- Added safe API error mapping for invalid URLs, missing repositories, and repositories without an active index.
+- Added deterministic per-conversation message sequence numbers and a migration so chat history always resumes in send order.
 
 ## Next
 
-- Expose repository, rebuild, conversation, and chat workflows through typed FastAPI routes.
+- Create the React and TypeScript repository library and persistent cited-chat UI.
 
 ## Known Risks
 
@@ -55,3 +59,4 @@ Milestone 6 complete — grounded chat and citations.
 - `cd backend; python -m pytest tests/github/test_client.py tests/rag/test_file_filter.py -q` — 14 passed
 - `cd backend; alembic upgrade head; python -m pytest -q` — 25 passed (one upstream Starlette deprecation warning)
 - `cd backend; python -m pytest -q` — 29 passed (one upstream Starlette deprecation warning)
+- `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)

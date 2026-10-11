@@ -2,7 +2,10 @@
 
 from fastapi import APIRouter
 
+from app.api.repositories import router as repositories_router
+
 router = APIRouter()
+router.include_router(repositories_router)
 
 
 @router.get("/health")

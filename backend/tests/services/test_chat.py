@@ -49,13 +49,14 @@ def test_ask_persists_a_grounded_answer_with_commit_pinned_citation() -> None:
             "Where is the application created?",
         )
 
-        messages = session.scalars(select(Message).order_by(Message.id)).all()
+        messages = session.scalars(select(Message).order_by(Message.sequence)).all()
         citations = session.scalars(select(Citation)).all()
         assert answer.text == "The application is created in src/app.py."
         assert answer.citations[0].url == (
             "https://github.com/acme/widgets/blob/abc123/src/app.py#L10-L10"
         )
         assert [message.role for message in messages] == ["user", "assistant"]
+        assert [message.sequence for message in messages] == [1, 2]
         assert [citation.url for citation in citations] == [
             "https://github.com/acme/widgets/blob/abc123/src/app.py#L10-L10"
         ]
