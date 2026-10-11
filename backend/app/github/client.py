@@ -1,6 +1,7 @@
 """GitHub URL validation and authenticated API access."""
 
 from urllib.parse import urlparse
+
 import base64
 
 import httpx
