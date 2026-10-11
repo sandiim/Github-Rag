@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 7 complete — typed backend API.
+Milestone 8 complete — React repository library and cited chat UI.
 
 ## Approved Decisions
 
@@ -37,10 +37,13 @@ Milestone 7 complete — typed backend API.
 - Added dependency injection for database, GitHub, Ollama embedding, retrieval, and completion services.
 - Added safe API error mapping for invalid URLs, missing repositories, and repositories without an active index.
 - Added deterministic per-conversation message sequence numbers and a migration so chat history always resumes in send order.
+- Added a Vite React and TypeScript web application with a typed backend API client.
+- Added repository library selection, GitHub URL submission, manual rebuild action, durable chat display, and commit-pinned citation links.
+- Added responsive two-pane styling and frontend component tests for repository selection and citation rendering.
 
 ## Next
 
-- Create the React and TypeScript repository library and persistent cited-chat UI.
+- Verify the end-to-end workflow and finalize setup, decision, and handoff documentation.
 
 ## Known Risks
 
@@ -60,3 +63,4 @@ Milestone 7 complete — typed backend API.
 - `cd backend; alembic upgrade head; python -m pytest -q` — 25 passed (one upstream Starlette deprecation warning)
 - `cd backend; python -m pytest -q` — 29 passed (one upstream Starlette deprecation warning)
 - `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
+- `cd frontend; npm test -- --run; npm run build` — 2 tests passed; production build passed
