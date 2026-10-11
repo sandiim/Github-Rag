@@ -2,6 +2,7 @@ import pytest
 import httpx
 
 from app.github.client import GitHubClient, InvalidRepositoryUrl, parse_repository_url
+from app.github.models import GitHubRepository, RepositoryReference
 
 
 def test_parse_repository_url_extracts_owner_and_name() -> None:
@@ -71,3 +72,31 @@ def test_list_files_downloads_repository_text_blobs() -> None:
     assert [(file.path, file.content, file.sha) for file in files] == [
         ("src/app.py", "print('hi')", "blob-sha")
     ]
+
+
+def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/repos/acme/widgets/git/trees/abc123":
+            return httpx.Response(
+                200,
+                json={
+                    "tree": [
+                        {"type": "blob", "path": "package-lock.json", "sha": "ignored"},
+                        {"type": "blob", "path": "src/app.py", "sha": "included"},
+                    ]
+                },
+            )
+        if request.url.path == "/repos/acme/widgets/git/blobs/included":
+            return httpx.Response(200, json={"encoding": "base64", "content": "cHJpbnQoMSk="})
+        raise AssertionError(f"Unexpected blob request: {request.url.path}")
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    repository = GitHubRepository(
+        reference=RepositoryReference(owner="acme", name="widgets"),
+        default_branch="main",
+        commit_sha="abc123",
+    )
+
+    files = client.list_files(repository)
+
+    assert [file.path for file in files] == ["src/app.py"]

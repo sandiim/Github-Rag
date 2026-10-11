@@ -7,6 +7,7 @@ import base64
 import httpx
 
 from app.github.models import GitHubFile, GitHubRepository, RepositoryReference
+from app.rag.file_filter import MAX_FILE_BYTES, should_index
 
 
 class InvalidRepositoryUrl(ValueError):
@@ -69,6 +70,8 @@ class GitHubClient:
         files: list[GitHubFile] = []
         for item in tree_response.json()["tree"]:
             if item["type"] != "blob":
+                continue
+            if item.get("size", 0) > MAX_FILE_BYTES or not should_index(item["path"], ""):
                 continue
             blob_response = self._client.get(
                 f"/repos/{reference.owner}/{reference.name}/git/blobs/{item['sha']}"
