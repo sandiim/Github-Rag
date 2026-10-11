@@ -31,6 +31,7 @@ class GitHubClient:
             base_url="https://api.github.com",
             headers={"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}"},
             transport=transport,
+            follow_redirects=True,
         )
 
     def resolve(self, url: str) -> GitHubRepository:
@@ -39,7 +40,12 @@ class GitHubClient:
         reference = parse_repository_url(url)
         repository_response = self._client.get(f"/repos/{reference.owner}/{reference.name}")
         repository_response.raise_for_status()
-        default_branch = repository_response.json()["default_branch"]
+        repository_data = repository_response.json()
+        full_name = repository_data.get("full_name", "")
+        if full_name.count("/") == 1:
+            owner, name = full_name.split("/", 1)
+            reference = RepositoryReference(owner=owner, name=name)
+        default_branch = repository_data["default_branch"]
         commit_response = self._client.get(
             f"/repos/{reference.owner}/{reference.name}/commits/{default_branch}"
         )
