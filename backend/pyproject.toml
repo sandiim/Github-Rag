@@ -1,0 +1,17 @@
+[project]
+name = "github-repository-rag-backend"
+version = "0.1.0"
+description = "FastAPI backend for the GitHub Repository RAG application"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "pydantic-settings",
+    "uvicorn[standard]",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

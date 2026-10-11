@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 1 — project contract and local infrastructure.
+Milestone 2 complete — FastAPI shell and typed settings.
 
 ## Approved Decisions
 
@@ -20,11 +20,12 @@ Milestone 1 — project contract and local infrastructure.
 - Removed the previous implementation and initialized a new Git repository on `feat/github-rag-mvp`.
 - Approved the architecture design and implementation plan.
 - Verified local tooling: Python 3.13.12, Node 24.20.0, Docker 29.1.2, Ollama 0.34.4, `llama3.1:latest`, and `nomic-embed-text:latest`.
+- Committed project contract and local PostgreSQL/pgvector configuration as `23ab91a`.
+- Added typed environment settings and a FastAPI application factory with `GET /health`.
 
 ## Next
 
-- Complete the project contract commit.
-- Create the FastAPI shell, typed settings, and health endpoint.
+- Create the PostgreSQL persistence models, migration, and repository/conversation store.
 
 ## Known Risks
 
@@ -38,3 +39,4 @@ Milestone 1 — project contract and local infrastructure.
 - `node --version` — v24.20.0
 - `docker --version` — Docker version 29.1.2
 - `ollama list` — `llama3.1:latest` and `nomic-embed-text:latest` installed
+- `cd backend; python -m pytest tests/test_settings.py tests/test_health.py -q` — 2 passed
