@@ -6,6 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic",
     "fastapi",
+    "httpx",
     "pgvector",
     "pydantic-settings",
     "psycopg[binary]",

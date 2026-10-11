@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 3 complete — persistence schema, session factory, and initial migration.
+Milestone 4 complete — GitHub discovery and safe file filtering.
 
 ## Approved Decisions
 
@@ -24,10 +24,12 @@ Milestone 3 complete — persistence schema, session factory, and initial migrat
 - Added typed environment settings and a FastAPI application factory with `GET /health`.
 - Added SQLAlchemy models for repositories, conversations, source files, chunks, messages, citations, and rebuild records.
 - Added the PostgreSQL session factory and an initial Alembic migration with pgvector support.
+- Added authenticated GitHub repository parsing, default-branch/commit resolution, and recursive text-blob discovery.
+- Added an allowlist filter that excludes dependencies, generated output, lockfiles, binaries, minified files, and oversized content.
 
 ## Next
 
-- Implement GitHub repository discovery and safe file filtering.
+- Build line-preserving chunking, Ollama embeddings, and versioned repository indexing.
 
 ## Known Risks
 
@@ -43,3 +45,4 @@ Milestone 3 complete — persistence schema, session factory, and initial migrat
 - `ollama list` — `llama3.1:latest` and `nomic-embed-text:latest` installed
 - `cd backend; python -m pytest tests/test_settings.py tests/test_health.py -q` — 2 passed
 - `cd backend; alembic upgrade head; python -m pytest tests/persistence -q` — 3 passed from a fresh PostgreSQL volume
+- `cd backend; python -m pytest tests/github/test_client.py tests/rag/test_file_filter.py -q` — 14 passed
