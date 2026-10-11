@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 8 complete — React repository library and cited chat UI.
+MVP implementation complete — end-to-end fixture automation remains next.
 
 ## Approved Decisions
 
@@ -40,10 +40,12 @@ Milestone 8 complete — React repository library and cited chat UI.
 - Added a Vite React and TypeScript web application with a typed backend API client.
 - Added repository library selection, GitHub URL submission, manual rebuild action, durable chat display, and commit-pinned citation links.
 - Added responsive two-pane styling and frontend component tests for repository selection and citation rendering.
+- Documented the verified local startup sequence and configured Vite to proxy API requests to FastAPI during development.
+- Recorded the PostgreSQL/pgvector and full-versioned-rebuild architecture decisions.
 
 ## Next
 
-- Verify the end-to-end workflow and finalize setup, decision, and handoff documentation.
+- Add deterministic Playwright fixtures for a browser-level end-to-end workflow without requiring live GitHub or Ollama.
 
 ## Known Risks
 
@@ -64,3 +66,4 @@ Milestone 8 complete — React repository library and cited chat UI.
 - `cd backend; python -m pytest -q` — 29 passed (one upstream Starlette deprecation warning)
 - `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
 - `cd frontend; npm test -- --run; npm run build` — 2 tests passed; production build passed
+- `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
