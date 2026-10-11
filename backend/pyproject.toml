@@ -4,8 +4,12 @@ version = "0.1.0"
 description = "FastAPI backend for the GitHub Repository RAG application"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic",
     "fastapi",
+    "pgvector",
     "pydantic-settings",
+    "psycopg[binary]",
+    "sqlalchemy",
     "uvicorn[standard]",
 ]
 

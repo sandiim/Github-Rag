@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 2 complete — FastAPI shell and typed settings.
+Milestone 3 complete — persistence schema, session factory, and initial migration.
 
 ## Approved Decisions
 
@@ -22,10 +22,12 @@ Milestone 2 complete — FastAPI shell and typed settings.
 - Verified local tooling: Python 3.13.12, Node 24.20.0, Docker 29.1.2, Ollama 0.34.4, `llama3.1:latest`, and `nomic-embed-text:latest`.
 - Committed project contract and local PostgreSQL/pgvector configuration as `23ab91a`.
 - Added typed environment settings and a FastAPI application factory with `GET /health`.
+- Added SQLAlchemy models for repositories, conversations, source files, chunks, messages, citations, and rebuild records.
+- Added the PostgreSQL session factory and an initial Alembic migration with pgvector support.
 
 ## Next
 
-- Create the PostgreSQL persistence models, migration, and repository/conversation store.
+- Implement GitHub repository discovery and safe file filtering.
 
 ## Known Risks
 
@@ -40,3 +42,4 @@ Milestone 2 complete — FastAPI shell and typed settings.
 - `docker --version` — Docker version 29.1.2
 - `ollama list` — `llama3.1:latest` and `nomic-embed-text:latest` installed
 - `cd backend; python -m pytest tests/test_settings.py tests/test_health.py -q` — 2 passed
+- `cd backend; alembic upgrade head; python -m pytest tests/persistence -q` — 3 passed from a fresh PostgreSQL volume
