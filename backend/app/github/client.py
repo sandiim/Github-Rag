@@ -32,6 +32,7 @@ class GitHubClient:
             headers={"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}"},
             transport=transport,
             follow_redirects=True,
+            timeout=httpx.Timeout(60.0, connect=10.0),
         )
 
     def resolve(self, url: str) -> GitHubRepository:
