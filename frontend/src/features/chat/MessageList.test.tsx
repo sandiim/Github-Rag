@@ -35,4 +35,25 @@ describe("MessageList", () => {
 
     expect(screen.getByRole("list")).toContainElement(screen.getByRole("link", { name: "stat.Rmd:141-220" }));
   });
+
+  it("shows a calm waiting status beside a provisional answer", () => {
+    const { container, rerender } = render(<MessageList messages={[{
+      role: "assistant", content: "", citations: []
+    }]} streaming={{ stage: "retrieving", waiting: true }} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Searching repository");
+    rerender(<MessageList messages={[{
+      role: "assistant", content: "A draft", citations: []
+    }]} streaming={{ stage: "generating", waiting: true }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for more");
+    rerender(<MessageList messages={[{
+      role: "assistant", content: "A draft", citations: []
+    }]} streaming={{ stage: "generating", waiting: false }} />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(container.querySelector(".stream-status")).toBeInTheDocument();
+    rerender(<MessageList messages={[{
+      role: "assistant", content: "A draft", citations: []
+    }]} streaming={null} />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });

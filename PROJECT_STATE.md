@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Hybrid active-index retrieval now combines vector and keyword candidates, with file-path weighting and result diversity. R Markdown selection, background ingestion, and structured inline-citation answers remain in place. The user reports the citation display looks better; a fresh browser end-to-end run of hybrid retrieval has not been verified here.
+New chat answers now stream provisional text, validated paragraph checkpoints with inline citations, and a committed final answer over NDJSON. The UI shows a calm waiting indicator during retrieval and pauses. Hybrid retrieval, background ingestion, and saved conversations remain in place. A full browser run against a real indexed repository has not yet been verified here.
 
 ## Approved Decisions
 
@@ -17,6 +17,9 @@ Hybrid active-index retrieval now combines vector and keyword candidates, with f
 
 ## Completed
 
+- Added a streaming chat endpoint and a generator-owned database session; the original JSON chat endpoint remains available.
+- Added incremental structured-answer parsing, readable text deltas, paragraph citation checkpoints, and final-only persistence with rollback on failure or interruption.
+- Added a streaming frontend reader, optimistic answer display, wait animation with reduced-motion support, abort-on-repository-switch, and retryable error handling that keeps the question in the composer.
 - Added PostgreSQL full-text candidates alongside pgvector results, with normalized file paths, path weighting, reciprocal-rank fusion, and per-file diversity before the six-chunk answer context.
 - Added deterministic ranking and query-scope tests; no migration or reindex is required for this query-only retrieval change.
 - Switched new completion responses from free-form citation-marker instructions to single-call JSON-schema sections with validated source IDs. Answers with no valid cited section no longer receive a trailing list of every retrieved chunk.
@@ -62,6 +65,8 @@ Hybrid active-index retrieval now combines vector and keyword candidates, with f
 
 ## Next
 
+- Restart the API and frontend, then ask a question in the browser; verify that text appears before completion, citations appear after each paragraph, the waiting indicator returns during pauses, and the saved conversation reloads correctly.
+- Profile streamed completion latency and connection behavior for long answers; keep an eye on the 8K context limit.
 - Try code-symbol and repository-overview questions in the browser after restarting the API; inspect citation relevance and query latency on larger repositories.
 - Add a measured context-token budget before increasing the number of returned chunks.
 - Restart the API and ask a new question about an indexed repository; verify links appear beside the new answer sections. Existing saved answers without inline markers retain their historical trailing lists.
@@ -72,6 +77,7 @@ Hybrid active-index retrieval now combines vector and keyword candidates, with f
 
 ## Known Risks
 
+- Structured JSON starts with non-visible syntax tokens, so streaming improves perceived latency but does not make Ollama generate faster; a malformed or uncited provisional paragraph may be removed at its checkpoint.
 - Full-text ranking currently computes across the active repository's chunks and paths without a dedicated combined search index; profile larger repositories before increasing candidate counts.
 - Private-repository access depends on the permissions of the configured GitHub token.
 - The 8K context reduces GPU memory use but can truncate long prompts; retrieved-context budgeting has not been implemented.
@@ -85,6 +91,14 @@ Hybrid active-index retrieval now combines vector and keyword candidates, with f
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current streamed-chat milestone:
+
+- Baseline before editing: `cd backend; python -m pytest -q` — 70 passed, one upstream Starlette warning; `cd frontend; npm test -- --run` — 10 passed.
+- `cd backend; python -m pytest -q` — 84 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 16 passed across 8 files.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
+- Read-only local Ollama structured stream smoke test: 10 draft deltas, one paragraph checkpoint, one complete event, and a valid source marker; no chat message was persisted.
 
 Current hybrid-retrieval milestone:
 

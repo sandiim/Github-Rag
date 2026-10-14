@@ -36,6 +36,28 @@ class ChatAnswer:
     citations: list[CitationResult]
 
 
+def build_chat_answer(full_name: str, raw_answer: str, context: list[RetrievedChunk]) -> ChatAnswer:
+    """Resolve model source markers into checked file-line citations."""
+
+    text, used_indices = resolve_citation_markers(raw_answer, context)
+    citations = [
+        CitationResult(
+            path=context[index].path,
+            start_line=context[index].start_line,
+            end_line=context[index].end_line,
+            url=build_github_url(
+                full_name,
+                context[index].commit_sha,
+                context[index].path,
+                context[index].start_line,
+                context[index].end_line,
+            ),
+        )
+        for index in used_indices
+    ]
+    return ChatAnswer(text=text, citations=citations)
+
+
 class ChatService:
     """Persist questions and grounded responses for a repository conversation."""
 
@@ -52,6 +74,23 @@ class ChatService:
             raise LookupError("Repository was not found")
         if repository.active_index_version is None:
             raise ValueError("Repository has no active index")
+
+        context = self._retriever.retrieve(repository_id, question)
+        raw_answer = self._generator.answer(question, context)
+        return self.persist_answer(repository_id, question, raw_answer, context)
+
+    def persist_answer(
+        self, repository_id: uuid.UUID, question: str, raw_answer: str,
+        context: list[RetrievedChunk],
+    ) -> ChatAnswer:
+        """Commit one validated user/assistant turn after generation has finished."""
+
+        repository = self._session.get(Repository, repository_id)
+        if repository is None:
+            raise LookupError("Repository was not found")
+        if repository.active_index_version is None:
+            raise ValueError("Repository has no active index")
+        answer = build_chat_answer(repository.full_name, raw_answer, context)
 
         conversation = self._session.scalar(
             select(Conversation).where(Conversation.repository_id == repository_id)
@@ -77,35 +116,15 @@ class ChatService:
                 content=question,
             )
         )
-        context = self._retriever.retrieve(repository_id, question)
-        text, used_indices = resolve_citation_markers(
-            self._generator.answer(question, context), context
-        )
         assistant_message = Message(
             conversation_id=conversation.id,
             sequence=next_sequence + 1,
             role="assistant",
-            content=text,
+            content=answer.text,
         )
         self._session.add(assistant_message)
         self._session.flush()
 
-        cited_context = [context[index] for index in used_indices]
-        citations = [
-            CitationResult(
-                path=chunk.path,
-                start_line=chunk.start_line,
-                end_line=chunk.end_line,
-                url=build_github_url(
-                    repository.full_name,
-                    chunk.commit_sha,
-                    chunk.path,
-                    chunk.start_line,
-                    chunk.end_line,
-                ),
-            )
-            for chunk in cited_context
-        ]
         self._session.add_all(
             Citation(
                 message_id=assistant_message.id,
@@ -114,8 +133,8 @@ class ChatService:
                 end_line=citation.end_line,
                 url=citation.url,
             )
-            for citation in citations
+            for citation in answer.citations
         )
         self._session.flush()
         self._session.commit()
-        return ChatAnswer(text=text, citations=citations)
+        return answer

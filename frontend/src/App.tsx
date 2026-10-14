@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiClient } from "./api-client/client";
 import { ChatPanel } from "./features/chat/ChatPanel";
+import type { StreamingState } from "./features/chat/MessageList";
 import { AddRepositoryForm } from "./features/repositories/AddRepositoryForm";
 import { IngestionStatus } from "./features/repositories/IngestionStatus";
 import { RebuildButton } from "./features/repositories/RebuildButton";
@@ -14,6 +15,11 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState("");
+  const [streaming, setStreaming] = useState<StreamingState | null>(null);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const activeStream = useRef<AbortController | null>(null);
+  const currentRepository = useRef<string | null>(null);
+  const waitTimer = useRef<number | null>(null);
   const selected = repositories.find(repository => repository.id === selectedId) ?? null;
   const hasActiveJob = repositories.some(repository =>
     repository.ingestion?.state === "queued" || repository.ingestion?.state === "running"
@@ -23,6 +29,7 @@ export default function App() {
 
   useEffect(() => {
     void refresh().catch(failure => setError((failure as Error).message));
+    return () => { activeStream.current?.abort(); };
   }, []);
 
   useEffect(() => {
@@ -34,12 +41,24 @@ export default function App() {
   }, [hasActiveJob]);
 
   const select = async (id: string) => {
+    activeStream.current?.abort();
+    activeStream.current = null;
+    currentRepository.current = id;
+    if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+    setStreaming(null);
+    setMessages([]);
     setSelectedId(id);
+    setConversationLoading(true);
     try {
-      setMessages((await api.conversation(id)).messages);
+      const conversation = await api.conversation(id);
+      if (currentRepository.current === id) setMessages(conversation.messages);
     } catch (failure) {
-      setMessages([]);
-      setError((failure as Error).message);
+      if (currentRepository.current === id) {
+        setMessages([]);
+        setError((failure as Error).message);
+      }
+    } finally {
+      if (currentRepository.current === id) setConversationLoading(false);
     }
   };
 
@@ -65,11 +84,58 @@ export default function App() {
           <RebuildButton onRebuild={() => rebuild(selected.id)} />}
       </>}
     </aside>
-    <ChatPanel repository={selected} messages={messages} onSend={async question => {
+    <ChatPanel repository={selected} messages={messages} streaming={streaming}
+      conversationLoading={conversationLoading} onSend={async question => {
       if (!selected) return;
+      if (activeStream.current) return;
+      const repositoryId = selected.id;
+      const controller = new AbortController();
+      activeStream.current = controller;
+      setError("");
       setMessages(current => [...current, { role: "user", content: question, citations: [] }]);
-      const answer = await api.ask(selected.id, question);
-      setMessages(current => [...current, { role: "assistant", content: answer.text, citations: answer.citations }]);
+      setMessages(current => [...current, { role: "assistant", content: "", citations: [] }]);
+      setStreaming({ stage: "retrieving", waiting: true });
+      try {
+        await api.askStream(repositoryId, question, event => {
+          if (activeStream.current !== controller) return;
+          if (event.type === "status") {
+            setStreaming({ stage: event.stage, waiting: true });
+          } else if (event.type === "delta") {
+            setMessages(current => current.map((message, index) => index === current.length - 1
+              ? { ...message, content: message.content + event.text } : message));
+            setStreaming({ stage: "generating", waiting: false });
+            if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+            waitTimer.current = window.setTimeout(() => {
+              if (activeStream.current === controller) setStreaming({ stage: "generating", waiting: true });
+            }, 650);
+          } else if (event.type === "checkpoint" || event.type === "complete") {
+            setMessages(current => current.map((message, index) => index === current.length - 1
+              ? { ...message, content: event.text, citations: event.citations } : message));
+            if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+            if (event.type === "complete") {
+              setStreaming(null);
+              activeStream.current = null;
+            } else {
+              setStreaming({ stage: "generating", waiting: true });
+            }
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          }
+        }, controller.signal);
+      } catch (failure) {
+        if (activeStream.current !== controller) return;
+        activeStream.current = null;
+        if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+        setStreaming(null);
+        setError((failure as Error).message);
+        try {
+          const saved = await api.conversation(repositoryId);
+          if (currentRepository.current === repositoryId) setMessages(saved.messages);
+        } catch {
+          if (currentRepository.current === repositoryId) setMessages(current => current.slice(0, -2));
+        }
+        throw failure;
+      }
     }} />
     {error && <p role="alert">{error}</p>}
   </div>;

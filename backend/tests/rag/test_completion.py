@@ -2,7 +2,7 @@ import json
 
 import httpx
 
-from app.rag.completion import CompletionClient
+from app.rag.completion import AnswerCheckpoint, AnswerComplete, AnswerDelta, CompletionClient
 from app.rag.retrieval import RetrievedChunk
 
 
@@ -77,5 +77,89 @@ def test_completion_client_skips_model_call_when_no_context_is_available() -> No
     client = CompletionClient("http://llm.test/v1", "test-key", "llama3.1:latest", httpx.MockTransport(handler))
 
     assert client.answer("What?", []) == (
+        "There is not enough information in the provided repository context to answer."
+    )
+
+
+def test_completion_stream_shows_text_then_validated_paragraph_checkpoint() -> None:
+    fragments = ['{"sections":[{"text":"The app ', 'runs here.","source_ids":[1]}]}']
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["stream"] is True
+        assert payload["response_format"]["type"] == "json_schema"
+        assert request.extensions["timeout"]["read"] == 180.0
+        lines = [
+            "data: " + json.dumps({"choices": [{"delta": {"content": fragment}}]}) + "\n\n"
+            for fragment in fragments
+        ]
+        return httpx.Response(200, text="".join(lines) + "data: [DONE]\n\n")
+
+    client = CompletionClient("http://llm.test/v1", "test-key", "llama3.1:latest", httpx.MockTransport(handler))
+    context = [RetrievedChunk("src/app.py", "app = FastAPI()", 10, 10, "abc123", 0.9)]
+
+    events = list(client.stream_answer("Where?", context))
+
+    assert events == [
+        AnswerDelta("The app "),
+        AnswerDelta("runs here."),
+        AnswerCheckpoint("The app runs here. [1]"),
+        AnswerComplete("The app runs here. [1]"),
+    ]
+
+
+def test_completion_stream_retracts_an_uncited_draft() -> None:
+    fragment = '{"sections":[{"text":"Unsupported.","source_ids":[99]}]}'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        line = "data: " + json.dumps({"choices": [{"delta": {"content": fragment}}]})
+        return httpx.Response(200, text=line + "\n\ndata: [DONE]\n\n")
+
+    client = CompletionClient("http://llm.test/v1", "test-key", "llama3.1:latest", httpx.MockTransport(handler))
+    context = [RetrievedChunk("src/app.py", "app = FastAPI()", 10, 10, "abc123", 0.9)]
+
+    events = list(client.stream_answer("Where?", context))
+
+    assert events == [
+        AnswerDelta("Unsupported."),
+        AnswerCheckpoint(""),
+        AnswerComplete("There is not enough information in the provided repository context to answer."),
+    ]
+
+
+def test_completion_stream_checkpoints_each_paragraph_before_final_answer() -> None:
+    fragments = [
+        '{"sections":[{"text":"First paragraph","source_ids":[1]},',
+        '{"text":"Second paragraph","source_ids":[1]}]}',
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        lines = [
+            "data: " + json.dumps({"choices": [{"delta": {"content": fragment}}]}) + "\n\n"
+            for fragment in fragments
+        ]
+        return httpx.Response(200, text="".join(lines) + "data: [DONE]\n\n")
+
+    client = CompletionClient("http://llm.test/v1", "test-key", "llama3.1:latest", httpx.MockTransport(handler))
+    context = [RetrievedChunk("README.md", "Evidence", 1, 1, "abc123", 0.9)]
+
+    events = list(client.stream_answer("What?", context))
+
+    assert [event.text for event in events if isinstance(event, AnswerCheckpoint)] == [
+        "First paragraph [1]",
+        "First paragraph [1]\n\nSecond paragraph [1]",
+    ]
+    assert events[-1] == AnswerComplete("First paragraph [1]\n\nSecond paragraph [1]")
+
+
+def test_completion_rejects_an_unpaired_unicode_surrogate() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        content = json.dumps({"sections": [{"text": "Bad \ud83d", "source_ids": [1]}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    client = CompletionClient("http://llm.test/v1", "test-key", "llama3.1:latest", httpx.MockTransport(handler))
+    context = [RetrievedChunk("README.md", "Evidence", 1, 1, "abc123", 0.9)]
+
+    assert client.answer("What?", context) == (
         "There is not enough information in the provided repository context to answer."
     )
