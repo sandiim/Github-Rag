@@ -26,8 +26,8 @@ export class ApiClient {
     return this.request<Repository>("/repositories", { method: "POST", body: JSON.stringify({ url }) });
   }
 
-  async rebuild(repositoryId: string): Promise<void> {
-    await this.request(`/repositories/${repositoryId}/rebuild`, { method: "POST" });
+  async rebuild(repositoryId: string): Promise<Repository> {
+    return this.request<Repository>(`/repositories/${repositoryId}/rebuild`, { method: "POST" });
   }
 
   async conversation(repositoryId: string): Promise<Conversation> {
