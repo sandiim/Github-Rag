@@ -89,11 +89,14 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
                         {"type": "blob", "path": "mlruns/1/metadata.json", "sha": "mlruns"},
                         {"type": "blob", "path": "data/round.json", "sha": "data"},
                         {"type": "blob", "path": "src/app.py", "sha": "included"},
+                        {"type": "blob", "path": "analysis/report.Rmd", "sha": "rmd"},
                     ]
                 },
             )
         if request.url.path == "/repos/acme/widgets/git/blobs/included":
             return httpx.Response(200, json={"encoding": "base64", "content": "cHJpbnQoMSk="})
+        if request.url.path == "/repos/acme/widgets/git/blobs/rmd":
+            return httpx.Response(200, json={"encoding": "base64", "content": "IyBSZXBvcnQ="})
         raise AssertionError(f"Unexpected blob request: {request.url.path}")
 
     client = GitHubClient("token", transport=httpx.MockTransport(handler))
@@ -106,8 +109,8 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
     candidates = client.list_candidates(repository)
     files = client.list_files(repository)
 
-    assert [candidate.path for candidate in candidates] == ["src/app.py"]
-    assert [file.path for file in files] == ["src/app.py"]
+    assert [candidate.path for candidate in candidates] == ["src/app.py", "analysis/report.Rmd"]
+    assert [file.path for file in files] == ["src/app.py", "analysis/report.Rmd"]
 
 
 def test_list_files_downloads_candidate_blobs_concurrently() -> None:

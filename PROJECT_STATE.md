@@ -2,14 +2,14 @@
 
 ## Current Milestone
 
-Durable background ingestion is implemented and covered by deterministic tests. Live imports of the user's larger GitHub repositories have not yet been reverified.
+Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. Live imports of the user's larger GitHub repositories have not yet been reverified.
 
 ## Approved Decisions
 
 - Build a single-user React and TypeScript web application with a Python/FastAPI backend.
 - Support public and private GitHub repositories using the configured server-side GitHub token.
 - Use PostgreSQL with pgvector in Docker for persistent repository, index, and chat data.
-- Use local Ollama `llama3.1:latest` for answers and `nomic-embed-text:latest` for embeddings.
+- Use an app-specific Ollama `github-rag-llama3.1:8k` alias for answers and `nomic-embed-text:latest` for embeddings.
 - Keep one persistent conversation per repository, titled from the repository name.
 - Offer a visible manual rebuild action; compare default-branch commit SHAs and fully rebuild only when changed.
 - Use a curated text-file allowlist and exclude dependencies, generated output, lockfiles, binaries, minified files, and oversized files.
@@ -17,6 +17,9 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Completed
 
+- Allowed R Markdown (`.rmd`/`.Rmd`) source files and raised the selection policy to version 3 so a manual rebuild can reindex an unchanged repository.
+- Added `ollama/Modelfile` with `num_ctx 8192`, created the local answer-model alias, and pointed the private `.env` and setup example at it and Ollama's local OpenAI-compatible endpoint.
+- Documented the local model setup and the context-window tradeoff in decision 0004.
 - Added durable queued/running/completed/failed ingestion jobs, a separate worker with leases and one automatic recovery attempt, and retryable safe errors.
 - Changed repository creation/rebuild to HTTP 202 enqueueing; the UI polls progress and keeps an existing active index chat-ready during rebuild.
 - Versioned the file-selection policy and excluded `data/` and `datasets/` before blob download.
@@ -54,6 +57,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Next
 
+- Restart the API to load the changed `.env`, then click Rebuild for any existing repository whose `.Rmd` file was previously omitted; verify file/chunk counts and a cited answer.
 - Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
 - Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
 - Add deterministic Playwright fixtures for a browser-level end-to-end workflow without requiring live GitHub or Ollama.
@@ -61,8 +65,9 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 ## Known Risks
 
 - Private-repository access depends on the permissions of the configured GitHub token.
+- The 8K context reduces GPU memory use but can truncate long prompts; retrieved-context budgeting has not been implemented.
 - The configured GitHub token returned `x-ratelimit-remaining: 0` for a blob request from `sandiim/Score_Prediction`; live import cannot succeed until quota resets. A valid `sandiim/Turbo_Fan_RUL_Prediction` URL currently returns HTTP 429 locally.
-- The configured local Ollama endpoint at `localhost:11434` was unreachable during diagnosis, so end-to-end embedding was not verified.
+- The local Ollama endpoint was unreachable during an earlier ingestion diagnosis; it responded during the current answer-model smoke test. End-to-end repository embedding after this change has not been verified.
 - The previously reported HTTP 422 for the Turbo_Fan URL was not reproduced from the plain URL in schema/parser tests; the exact browser request body remains unknown.
 - Fetching each selected blob via GitHub REST still spends one API request per file; bounded batches limit waste but do not remove this scalability constraint.
 - GitHub's truncated recursive tree response is rejected visibly rather than activated as an incomplete index; a different fetch method is needed for repositories that exceed this API limit.
@@ -71,6 +76,15 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current R Markdown/context milestone:
+
+- `cd backend; python -m pytest -q` — 59 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 6 test files / 8 tests passed.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
+- `ollama create github-rag-llama3.1:8k -f ollama/Modelfile` — local alias created successfully.
+- A local OpenAI-compatible chat-completion request to `github-rag-llama3.1:8k` returned `OK`; `ollama ps` reported context 8192 and 100% GPU placement.
+- A live repository rebuild and cited chat answer have not yet been tested after the selection-policy change.
 
 Current background-ingestion milestone:
 

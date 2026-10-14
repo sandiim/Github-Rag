@@ -3,7 +3,7 @@ import pytest
 from app.rag.file_filter import should_index
 
 
-@pytest.mark.parametrize("path", ["src/app.py", "README.md", "config/app.yaml", "Dockerfile"])
+@pytest.mark.parametrize("path", ["src/app.py", "README.md", "analysis/report.Rmd", "config/app.yaml", "Dockerfile"])
 def test_allowlisted_text_files_are_indexed(path: str) -> None:
     assert should_index(path, "meaningful text") is True
 

@@ -26,6 +26,8 @@ React + TypeScript
 
 The file-selection policy has a version independent of the commit SHA. A manual rebuild reindexes an unchanged commit when that policy changes. Chat always reads the active index, so a failed or in-progress rebuild leaves the prior version usable.
 
+The file filter admits selected text suffixes, including R Markdown (`.rmd`), before chunking. Answer generation calls the local Ollama OpenAI-compatible API using the app-specific `github-rag-llama3.1:8k` alias; embeddings use `nomic-embed-text:latest` through Ollama's native API.
+
 ## Core Rules
 
 - Routes call services; services own business workflows.

@@ -50,6 +50,7 @@ def test_rebuild_activates_a_complete_filtered_index() -> None:
         [
             GitHubFile(path="src/app.py", content="one\ntwo", sha="blob-1"),
             GitHubFile(path="package-lock.json", content="ignored", sha="blob-2"),
+            GitHubFile(path="analysis/report.Rmd", content="# Report\nResult", sha="blob-3"),
         ],
     )
 
@@ -72,10 +73,10 @@ def test_rebuild_activates_a_complete_filtered_index() -> None:
         assert result.changed is True
         assert repository.active_commit_sha == "commit-123"
         assert repository.active_index_version == result.index_version
-        assert [source_file.path for source_file in source_files] == ["src/app.py"]
-        assert [(chunk.start_line, chunk.end_line) for chunk in chunks] == [(1, 2)]
+        assert [source_file.path for source_file in source_files] == ["src/app.py", "analysis/report.Rmd"]
+        assert [(chunk.start_line, chunk.end_line) for chunk in chunks] == [(1, 2), (1, 2)]
         assert chunks[0].embedding == [0.5] * 768
-        assert ("embedding", 1, 2) in events
+        assert ("embedding", 1, 3) in events
         assert repository.active_index_policy_version == INDEX_POLICY_VERSION
 
 
@@ -158,7 +159,7 @@ def test_same_commit_rebuilds_when_selection_policy_changed() -> None:
         repository = Repository(
             url="https://github.com/acme/widgets", full_name="acme/widgets",
             default_branch="main", active_commit_sha="commit-123",
-            active_index_policy_version=1,
+            active_index_policy_version=2,
         )
         session.add(repository)
         session.flush()
