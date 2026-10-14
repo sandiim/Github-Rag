@@ -23,11 +23,6 @@ class IngestionResponse(BaseModel):
     error_message: str | None
 
 
-class RebuildResponse(BaseModel):
-    changed: bool
-    status: str
-
-
 class CitationResponse(BaseModel):
     path: str
     start_line: int

@@ -4,7 +4,7 @@ import time
 import pytest
 import httpx
 
-from app.github.client import GitHubClient, GitHubRateLimitError, InvalidRepositoryUrl, parse_repository_url
+from app.github.client import GitHubClient, GitHubRateLimitError, GitHubTreeTruncatedError, InvalidRepositoryUrl, parse_repository_url
 from app.github.models import GitHubRepository, RepositoryReference
 
 
@@ -199,3 +199,13 @@ def test_list_files_stops_scheduling_blobs_after_rate_limit() -> None:
         client.list_files(repository)
 
     assert requests <= 8
+
+
+def test_truncated_tree_cannot_be_marked_as_a_complete_index() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"truncated": True, "tree": []})
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    repository = GitHubRepository(RepositoryReference("acme", "widgets"), "main", "abc123")
+    with pytest.raises(GitHubTreeTruncatedError):
+        client.list_candidates(repository)

@@ -20,6 +20,10 @@ class GitHubRateLimitError(Exception):
     """Raised when GitHub's API quota is exhausted."""
 
 
+class GitHubTreeTruncatedError(Exception):
+    """Raised rather than silently indexing an incomplete recursive tree."""
+
+
 def parse_repository_url(url: str) -> RepositoryReference:
     """Extract a GitHub repository reference from a canonical HTTPS URL."""
 
@@ -86,9 +90,12 @@ class GitHubClient:
             f"/repos/{reference.owner}/{reference.name}/git/trees/{repository.commit_sha}",
             params={"recursive": "1"},
         )
+        tree_data = tree_response.json()
+        if tree_data.get("truncated"):
+            raise GitHubTreeTruncatedError("GitHub returned an incomplete repository tree")
         return [
             GitHubBlobCandidate(path=item["path"], sha=item["sha"], size=item.get("size", 0))
-            for item in tree_response.json()["tree"]
+            for item in tree_data["tree"]
             if item["type"] == "blob"
             and item.get("size", 0) <= MAX_FILE_BYTES
             and should_index(item["path"], "")

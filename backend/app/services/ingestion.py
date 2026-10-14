@@ -1,13 +1,14 @@
 """Run one durable ingestion job outside HTTP request handling."""
 
 from datetime import datetime, timezone
+import logging
 from threading import Event, Thread
 from uuid import UUID
 
 import httpx
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.github.client import GitHubRateLimitError
+from app.github.client import GitHubRateLimitError, GitHubTreeTruncatedError
 from app.persistence.jobs import JobStore
 from app.persistence.models import IngestionJob
 from app.services.indexing import EmbeddingProvider, GitHubRepositoryReader, IndexingService
@@ -17,6 +18,8 @@ def safe_error(error: Exception) -> str:
     """Keep credentials, URLs and source content out of persisted errors."""
     if isinstance(error, GitHubRateLimitError):
         return "GitHub API rate limit reached. Retry after the quota resets."
+    if isinstance(error, GitHubTreeTruncatedError):
+        return "GitHub returned an incomplete repository tree; this repository needs a different fetch method."
     if isinstance(error, httpx.TimeoutException):
         return "A GitHub or Ollama request timed out. Check connectivity and retry."
     if isinstance(error, httpx.HTTPStatusError):
@@ -26,7 +29,7 @@ def safe_error(error: Exception) -> str:
         return f"An external service returned HTTP {code}. Retry after checking the service."
     if isinstance(error, httpx.RequestError):
         return "Could not reach GitHub or Ollama. Check connectivity and retry."
-    return "Repository ingestion failed. Check worker logs and retry."
+    return "Repository ingestion failed. Check the worker and retry."
 
 
 class IngestionRunner:
@@ -63,7 +66,9 @@ class IngestionRunner:
                 job.lease_expires_at = None
                 session.commit()
         except Exception as error:
-            self._jobs.fail(job_id, safe_error(error))
+            message = safe_error(error)
+            logging.warning("Ingestion job %s failed (%s): %s", job_id, type(error).__name__, message)
+            self._jobs.fail(job_id, message)
         finally:
             stop.set()
             heartbeat.join(timeout=2)

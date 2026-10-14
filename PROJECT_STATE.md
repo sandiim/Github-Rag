@@ -65,6 +65,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 - The configured local Ollama endpoint at `localhost:11434` was unreachable during diagnosis, so end-to-end embedding was not verified.
 - The previously reported HTTP 422 for the Turbo_Fan URL was not reproduced from the plain URL in schema/parser tests; the exact browser request body remains unknown.
 - Fetching each selected blob via GitHub REST still spends one API request per file; bounded batches limit waste but do not remove this scalability constraint.
+- GitHub's truncated recursive tree response is rejected visibly rather than activated as an incomplete index; a different fetch method is needed for repositories that exceed this API limit.
 - The worker downloads selected blobs one at a time to expose accurate progress; large repositories may still take substantial time.
 - A stopped worker leaves imports queued; the UI will show “Waiting for worker” until it restarts. An expired running lease gets one automatic retry.
 - `.env.example` documents the local database and embedding settings without exposing credentials.
@@ -74,7 +75,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 Current background-ingestion milestone:
 
 - `cd backend; alembic upgrade head` — migration applied to the configured local database; `ingestion_jobs` table and new columns inspected.
-- `cd backend; alembic upgrade head; python -m pytest -q` — 57 passed, one upstream Starlette warning.
+- `cd backend; alembic upgrade head; python -m pytest -q` — 58 passed, one upstream Starlette warning.
 - Plain `https://github.com/sandiim/Turbo_Fan_RUL_Prediction` passed the request-schema and URL parser in isolation; browser submission has not been reverified.
 - `cd backend; python -m pytest tests/api/test_ingestion_flow.py -q` — 1 passed, one upstream Starlette warning.
 - `cd frontend; npm test -- --run` — 6 test files / 8 tests passed, including add/poll/chat-ready behavior.

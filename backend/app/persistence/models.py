@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, synonym
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
 
@@ -96,7 +96,6 @@ class IngestionJob(Base):
     index_version: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     kind: Mapped[str] = mapped_column(String(16), default="rebuild")
     state: Mapped[str] = mapped_column(String(32))
-    status = synonym("state")  # Compatibility until indexing no longer creates records.
     stage: Mapped[str | None] = mapped_column(String(32), nullable=True)
     completed_files: Mapped[int] = mapped_column(Integer, default=0)
     total_files: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -105,6 +104,3 @@ class IngestionJob(Base):
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-RebuildRecord = IngestionJob
