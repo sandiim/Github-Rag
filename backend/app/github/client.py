@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from app.github.models import GitHubFile, GitHubRepository, RepositoryReference
+from app.github.models import GitHubBlobCandidate, GitHubFile, GitHubRepository, RepositoryReference
 from app.rag.file_filter import MAX_FILE_BYTES, should_index
 
 
@@ -65,37 +65,45 @@ class GitHubClient:
     def list_files(self, repository: GitHubRepository) -> list[GitHubFile]:
         """Download decoded blobs from a repository's indexed commit tree."""
 
+        candidates = self.list_candidates(repository)
+
+        files: list[GitHubFile] = []
+        with ThreadPoolExecutor(max_workers=min(8, len(candidates) or 1)) as executor:
+            for start in range(0, len(candidates), 8):
+                files.extend(
+                    file for file in executor.map(
+                        lambda candidate: self.download_blob(repository, candidate),
+                        candidates[start:start + 8],
+                    ) if file is not None
+                )
+        return files
+
+    def list_candidates(self, repository: GitHubRepository) -> list[GitHubBlobCandidate]:
+        """Select eligible tree blobs without downloading their content."""
+
         reference = repository.reference
         tree_response = self._get(
             f"/repos/{reference.owner}/{reference.name}/git/trees/{repository.commit_sha}",
             params={"recursive": "1"},
         )
-        candidates = [
-            item
+        return [
+            GitHubBlobCandidate(path=item["path"], sha=item["sha"], size=item.get("size", 0))
             for item in tree_response.json()["tree"]
             if item["type"] == "blob"
             and item.get("size", 0) <= MAX_FILE_BYTES
             and should_index(item["path"], "")
         ]
 
-        def download(item: dict[str, object]) -> GitHubFile | None:
-            blob_response = self._get(
-                f"/repos/{reference.owner}/{reference.name}/git/blobs/{item['sha']}"
-            )
-            blob = blob_response.json()
-            if blob.get("encoding") != "base64":
-                return None
-            content = base64.b64decode(blob["content"]).decode("utf-8", errors="replace")
-            return GitHubFile(path=str(item["path"]), content=content, sha=str(item["sha"]))
-
-        files: list[GitHubFile] = []
-        with ThreadPoolExecutor(max_workers=min(8, len(candidates) or 1)) as executor:
-            for start in range(0, len(candidates), 8):
-                files.extend(
-                    file for file in executor.map(download, candidates[start:start + 8])
-                    if file is not None
-                )
-        return files
+    def download_blob(self, repository: GitHubRepository, candidate: GitHubBlobCandidate) -> GitHubFile | None:
+        reference = repository.reference
+        blob_response = self._get(
+            f"/repos/{reference.owner}/{reference.name}/git/blobs/{candidate.sha}"
+        )
+        blob = blob_response.json()
+        if blob.get("encoding") != "base64":
+            return None
+        content = base64.b64decode(blob["content"]).decode("utf-8", errors="replace")
+        return GitHubFile(path=candidate.path, content=content, sha=candidate.sha)
 
     def _get(self, path: str, **kwargs: object) -> httpx.Response:
         response = self._client.get(path, **kwargs)

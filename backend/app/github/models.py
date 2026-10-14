@@ -27,3 +27,10 @@ class GitHubFile:
     path: str
     content: str
     sha: str
+
+
+@dataclass(frozen=True)
+class GitHubBlobCandidate:
+    path: str
+    sha: str
+    size: int

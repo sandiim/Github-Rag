@@ -87,6 +87,7 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
                         {"type": "blob", "path": "package-lock.json", "sha": "ignored"},
                         {"type": "blob", "path": "venv/Lib/site-packages/pkg/module.py", "sha": "venv"},
                         {"type": "blob", "path": "mlruns/1/metadata.json", "sha": "mlruns"},
+                        {"type": "blob", "path": "data/round.json", "sha": "data"},
                         {"type": "blob", "path": "src/app.py", "sha": "included"},
                     ]
                 },
@@ -102,8 +103,10 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
         commit_sha="abc123",
     )
 
+    candidates = client.list_candidates(repository)
     files = client.list_files(repository)
 
+    assert [candidate.path for candidate in candidates] == ["src/app.py"]
     assert [file.path for file in files] == ["src/app.py"]
 
 
