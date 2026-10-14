@@ -40,6 +40,6 @@
 - If retrieved context cannot support an answer, return an explicit insufficient-evidence response.
 
 ## Project Memory
-- Before work, read `PROJECT_STATE.md`, `docs/architecture.md`, and any relevant record in `docs/decisions/`.
+- Before work, read `PROJECT_STATE.md`; consult `docs/architecture.md` and only the decision records relevant to the task. For frontend redesign, start with `ui-improvements.md`.
 - After meaningful work, update `PROJECT_STATE.md` with completed work, verification commands, current state, and the next task.
 - Record durable architecture changes in `docs/decisions/`.

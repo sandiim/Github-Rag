@@ -2,7 +2,9 @@
 
 ## Current Milestone
 
-New chat answers now stream provisional text, validated paragraph checkpoints with inline citations, and a committed final answer over NDJSON. The UI shows a calm waiting indicator during retrieval and pauses. Hybrid retrieval, background ingestion, and saved conversations remain in place. A full browser run against a real indexed repository has not yet been verified here.
+The streamed cited-chat milestone is committed as `808cd61` (`feat: stream cited chat answers`). The user reports that the streaming UI feels substantially better in their browser; a formal end-to-end browser test against a real repository has not been recorded. The next focus is a professional frontend redesign. `ui-improvements.md` is a proposed handoff, not implemented UI. The user has not chosen dark developer-tool versus light documentation styling.
+
+Handoff note: the working tree contains a pre-existing, uncommitted `backend/app/rag/completion.py` client-timeout edit. Preserve it; do not assume it is part of `808cd61`. The streamed request itself has a committed 180-second timeout. `.env` is private and must not be displayed or committed.
 
 ## Approved Decisions
 
@@ -11,7 +13,7 @@ New chat answers now stream provisional text, validated paragraph checkpoints wi
 - Use PostgreSQL with pgvector in Docker for persistent repository, index, and chat data.
 - Use an app-specific Ollama `github-rag-llama3.1:8k` alias for answers and `nomic-embed-text:latest` for embeddings.
 - Keep one persistent conversation per repository, titled from the repository name.
-- Offer a visible manual rebuild action; compare default-branch commit SHAs and fully rebuild only when changed.
+- Offer a visible manual rebuild action; compare default-branch commit SHAs and fully rebuild when the commit or file-selection policy version changes.
 - Use a curated text-file allowlist and exclude dependencies, generated output, lockfiles, binaries, minified files, and oversized files.
 - Link citations to exact GitHub commit, path, and inclusive line range.
 
@@ -65,15 +67,13 @@ New chat answers now stream provisional text, validated paragraph checkpoints wi
 
 ## Next
 
-- Restart the API and frontend, then ask a question in the browser; verify that text appears before completion, citations appear after each paragraph, the waiting indicator returns during pauses, and the saved conversation reloads correctly.
+- Ask the user to choose dark developer-tool or light documentation styling, then review `ui-improvements.md` and implement the redesign in focused frontend milestones. Preserve existing add/select/rebuild/retry/chat, inline citations, and streaming behavior.
+- Verify the redesign at desktop and narrow viewport sizes, including keyboard focus and reduced-motion behavior; run frontend tests and build and report actual results.
+- Add deterministic browser-level end-to-end coverage for streaming, citations, and saved-conversation reload when practical; the user's positive browser report is not a formal test record.
 - Profile streamed completion latency and connection behavior for long answers; keep an eye on the 8K context limit.
 - Try code-symbol and repository-overview questions in the browser after restarting the API; inspect citation relevance and query latency on larger repositories.
 - Add a measured context-token budget before increasing the number of returned chunks.
-- Restart the API and ask a new question about an indexed repository; verify links appear beside the new answer sections. Existing saved answers without inline markers retain their historical trailing lists.
-- Restart the API to load the changed `.env`, then click Rebuild for any existing repository whose `.Rmd` file was previously omitted; verify file/chunk counts and a cited answer.
-- Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
 - Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
-- Add deterministic Playwright fixtures for a browser-level end-to-end workflow without requiring live GitHub or Ollama.
 
 ## Known Risks
 
@@ -91,6 +91,13 @@ New chat answers now stream provisional text, validated paragraph checkpoints wi
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current handoff check (2026-10-14; documentation-only update):
+
+- `cd backend; python -m pytest -q` — 84 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 16 passed across 8 files.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
+- No new browser end-to-end test was run for the UI proposal; the redesign is not implemented.
 
 Current streamed-chat milestone:
 

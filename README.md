@@ -2,6 +2,8 @@
 
 A single-user local web app that indexes public or private GitHub repositories and answers questions with commit-pinned file and line citations.
 
+The app persists one conversation per repository, indexes in a separate worker, combines vector and keyword retrieval, and streams cited answers in the browser. See `PROJECT_STATE.md` for current verification and open work. The proposed frontend redesign is documented in `ui-improvements.md`.
+
 ## Run locally
 
 1. Copy `.env.example` to `.env` and set your GitHub token. Keep `.env` private. The example uses Ollama's local OpenAI-compatible endpoint for answers and local Ollama for embeddings.
