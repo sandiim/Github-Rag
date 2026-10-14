@@ -17,6 +17,8 @@ def test_allowlisted_text_files_are_indexed(path: str) -> None:
         ".git/config",
         "venv/Lib/site-packages/pkg/module.py",
         "mlruns/1/metadata.json",
+        "data/sofascore/matches/round_17.json",
+        "datasets/train.json",
     ],
 )
 def test_generated_or_dependency_files_are_excluded(path: str) -> None:

@@ -82,7 +82,7 @@ class RepositoryService:
             select(Conversation).where(Conversation.repository_id == repository.id)
         )
         if conversation is None:
-            raise LookupError("Conversation was not found")
+            return ConversationSummary(title=repository.full_name.rsplit("/", 1)[-1], messages=[])
         messages = self._session.scalars(
             select(Message).where(Message.conversation_id == conversation.id).order_by(Message.sequence)
         ).all()
