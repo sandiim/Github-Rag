@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 import httpx
 
@@ -100,3 +103,41 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
     files = client.list_files(repository)
 
     assert [file.path for file in files] == ["src/app.py"]
+
+
+def test_list_files_downloads_candidate_blobs_concurrently() -> None:
+    active = 0
+    maximum_active = 0
+    lock = threading.Lock()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal active, maximum_active
+        if request.url.path.endswith("/git/trees/abc123"):
+            return httpx.Response(
+                200,
+                json={
+                    "tree": [
+                        {"type": "blob", "path": f"src/{number}.py", "sha": f"blob-{number}"}
+                        for number in range(4)
+                    ]
+                },
+            )
+        with lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        return httpx.Response(200, json={"encoding": "base64", "content": "b25l"})
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    repository = GitHubRepository(
+        reference=RepositoryReference(owner="acme", name="widgets"),
+        default_branch="main",
+        commit_sha="abc123",
+    )
+
+    files = client.list_files(repository)
+
+    assert len(files) == 4
+    assert maximum_active > 1

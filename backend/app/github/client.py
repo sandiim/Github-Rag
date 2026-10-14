@@ -3,6 +3,7 @@
 from urllib.parse import urlparse
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
@@ -67,19 +68,24 @@ class GitHubClient:
             params={"recursive": "1"},
         )
         tree_response.raise_for_status()
-        files: list[GitHubFile] = []
-        for item in tree_response.json()["tree"]:
-            if item["type"] != "blob":
-                continue
-            if item.get("size", 0) > MAX_FILE_BYTES or not should_index(item["path"], ""):
-                continue
+        candidates = [
+            item
+            for item in tree_response.json()["tree"]
+            if item["type"] == "blob"
+            and item.get("size", 0) <= MAX_FILE_BYTES
+            and should_index(item["path"], "")
+        ]
+
+        def download(item: dict[str, object]) -> GitHubFile | None:
             blob_response = self._client.get(
                 f"/repos/{reference.owner}/{reference.name}/git/blobs/{item['sha']}"
             )
             blob_response.raise_for_status()
             blob = blob_response.json()
             if blob.get("encoding") != "base64":
-                continue
+                return None
             content = base64.b64decode(blob["content"]).decode("utf-8", errors="replace")
-            files.append(GitHubFile(path=item["path"], content=content, sha=item["sha"]))
-        return files
+            return GitHubFile(path=str(item["path"]), content=content, sha=str(item["sha"]))
+
+        with ThreadPoolExecutor(max_workers=min(8, len(candidates) or 1)) as executor:
+            return [file for file in executor.map(download, candidates) if file is not None]
