@@ -11,6 +11,16 @@ class RepositoryResponse(BaseModel):
     id: str
     name: str
     status: str
+    ingestion: "IngestionResponse | None" = None
+
+
+class IngestionResponse(BaseModel):
+    id: str
+    state: str
+    stage: str | None
+    completed_files: int
+    total_files: int | None
+    error_message: str | None
 
 
 class RebuildResponse(BaseModel):

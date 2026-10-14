@@ -1,14 +1,16 @@
 """Repository creation and listing workflows."""
 
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.github.client import GitHubClient
-from app.persistence.models import Citation, Conversation, Message, Repository
-from app.services.indexing import IndexingService
+from app.github.client import parse_repository_url
+from app.persistence.models import Citation, Conversation, IngestionJob, Message, Repository
 
 
 @dataclass(frozen=True)
@@ -16,12 +18,17 @@ class RepositorySummary:
     id: str
     name: str
     status: str
+    latest_job: IngestionJobSummary | None = None
 
 
 @dataclass(frozen=True)
-class RebuildSummary:
-    changed: bool
-    status: str
+class IngestionJobSummary:
+    id: str
+    state: str
+    stage: str | None
+    completed_files: int
+    total_files: int | None
+    error_message: str | None
 
 
 @dataclass(frozen=True)
@@ -46,21 +53,27 @@ class ConversationSummary:
 
 
 class RepositoryService:
-    def __init__(self, session: Session, github: GitHubClient, indexing: IndexingService) -> None:
+    def __init__(self, session: Session, github: object = None, indexing: object = None) -> None:
         self._session = session
-        self._github = github
-        self._indexing = indexing
 
     def create(self, url: str) -> RepositorySummary:
-        resolved = self._github.resolve(url)
+        reference = parse_repository_url(url)
+        full_name = f"{reference.owner}/{reference.name}"
+        existing = self._session.scalar(select(Repository).where(Repository.full_name == full_name))
+        if existing is not None:
+            return self._summary(existing)
         repository = Repository(
-            url=url,
-            full_name=f"{resolved.reference.owner}/{resolved.reference.name}",
-            default_branch=resolved.default_branch,
+            url=f"https://github.com/{full_name}",
+            full_name=full_name,
+            default_branch=None,
+            status="pending",
         )
         self._session.add(repository)
         self._session.flush()
-        self._indexing.rebuild(repository.id)
+        self._session.add(IngestionJob(
+            repository_id=repository.id, kind="import", state="queued",
+            created_at=datetime.now(timezone.utc),
+        ))
         self._session.commit()
         return self._summary(repository)
 
@@ -70,11 +83,22 @@ class RepositoryService:
     def get(self, repository_id: str) -> RepositorySummary:
         return self._summary(self._repository(repository_id))
 
-    def rebuild(self, repository_id: str) -> RebuildSummary:
+    def rebuild(self, repository_id: str) -> RepositorySummary:
         repository = self._repository(repository_id)
-        result = self._indexing.rebuild(repository.id)
+        active = self._session.scalar(
+            select(IngestionJob).where(
+                IngestionJob.repository_id == repository.id,
+                IngestionJob.state.in_(("queued", "running")),
+            )
+        )
+        if active is not None:
+            return self._summary(repository)
+        self._session.add(IngestionJob(
+            repository_id=repository.id, kind="rebuild", state="queued",
+            created_at=datetime.now(timezone.utc),
+        ))
         self._session.commit()
-        return RebuildSummary(changed=result.changed, status=repository.status)
+        return self._summary(repository)
 
     def conversation(self, repository_id: str) -> ConversationSummary:
         repository = self._repository(repository_id)
@@ -114,10 +138,18 @@ class RepositoryService:
             raise LookupError("Repository was not found")
         return repository
 
-    @staticmethod
-    def _summary(repository: Repository) -> RepositorySummary:
+    def _summary(self, repository: Repository) -> RepositorySummary:
+        job = self._session.scalar(
+            select(IngestionJob).where(IngestionJob.repository_id == repository.id)
+            .order_by(IngestionJob.created_at.desc(), IngestionJob.id.desc()).limit(1)
+        )
         return RepositorySummary(
             id=str(repository.id),
             name=repository.full_name.rsplit("/", 1)[-1],
             status=repository.status,
+            latest_job=IngestionJobSummary(
+                id=str(job.id), state=job.state, stage=job.stage,
+                completed_files=job.completed_files, total_files=job.total_files,
+                error_message=job.error_message,
+            ) if job is not None else None,
         )

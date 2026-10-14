@@ -6,7 +6,7 @@ from app.api.dependencies import get_chat_service, get_repository_service
 from app.github.client import GitHubRateLimitError, InvalidRepositoryUrl
 from app.api.schemas import (
     ChatRequest, ChatResponse, CitationResponse, ConversationResponse, CreateRepositoryRequest,
-    MessageResponse, RebuildResponse, RepositoryResponse,
+    MessageResponse, IngestionResponse, RepositoryResponse,
 )
 from app.services.chat import ChatService
 from app.services.repositories import RepositoryService, RepositorySummary
@@ -14,7 +14,7 @@ from app.services.repositories import RepositoryService, RepositorySummary
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 
 
-@router.post("", response_model=RepositoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=RepositoryResponse, status_code=status.HTTP_202_ACCEPTED)
 def create_repository(
     request: CreateRepositoryRequest,
     service: RepositoryService = Depends(get_repository_service),
@@ -35,7 +35,10 @@ def list_repositories(
 
 
 def _repository_response(repository: RepositorySummary) -> RepositoryResponse:
-    return RepositoryResponse(id=repository.id, name=repository.name, status=repository.status)
+    return RepositoryResponse(
+        id=repository.id, name=repository.name, status=repository.status,
+        ingestion=IngestionResponse(**repository.latest_job.__dict__) if repository.latest_job else None,
+    )
 
 
 @router.get("/{repository_id}", response_model=RepositoryResponse)
@@ -46,15 +49,15 @@ def get_repository(repository_id: str, service: RepositoryService = Depends(get_
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
-@router.post("/{repository_id}/rebuild", response_model=RebuildResponse)
-def rebuild_repository(repository_id: str, service: RepositoryService = Depends(get_repository_service)) -> RebuildResponse:
+@router.post("/{repository_id}/rebuild", response_model=RepositoryResponse, status_code=status.HTTP_202_ACCEPTED)
+def rebuild_repository(repository_id: str, service: RepositoryService = Depends(get_repository_service)) -> RepositoryResponse:
     try:
         result = service.rebuild(repository_id)
     except GitHubRateLimitError as error:
         raise HTTPException(status_code=429, detail=str(error)) from error
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    return RebuildResponse(changed=result.changed, status=result.status)
+    return _repository_response(result)
 
 
 @router.get("/{repository_id}/conversation", response_model=ConversationResponse)

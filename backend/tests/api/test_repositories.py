@@ -23,10 +23,10 @@ def test_create_and_list_repositories_use_typed_responses() -> None:
     created = client.post("/repositories", json={"url": "https://github.com/acme/widgets"})
     listed = client.get("/repositories")
 
-    assert created.status_code == 201
-    assert created.json() == {"id": "repo-1", "name": "widgets", "status": "ready"}
+    assert created.status_code == 202
+    assert created.json() == {"id": "repo-1", "name": "widgets", "status": "ready", "ingestion": None}
     assert listed.status_code == 200
-    assert listed.json() == [{"id": "repo-1", "name": "widgets", "status": "ready"}]
+    assert listed.json() == [{"id": "repo-1", "name": "widgets", "status": "ready", "ingestion": None}]
 
 
 def test_create_repository_maps_invalid_url_to_validation_error() -> None:

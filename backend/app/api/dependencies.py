@@ -6,13 +6,11 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.core.settings import Settings
-from app.github.client import GitHubClient
 from app.persistence.session import create_session_factory
 from app.rag.ollama import EmbeddingClient
 from app.rag.completion import CompletionClient
 from app.rag.retrieval import RetrievalService
 from app.services.chat import ChatService
-from app.services.indexing import IndexingService
 from app.services.repositories import RepositoryService
 
 
@@ -26,11 +24,7 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def get_repository_service(session: Session = Depends(get_session)) -> RepositoryService:
-    settings = Settings()
-    github = GitHubClient(settings.github_token)
-    embeddings = EmbeddingClient(settings.ollama_base_url, settings.embedding_model)
-    indexing = IndexingService(session, github, embeddings)
-    return RepositoryService(session, github, indexing)
+    return RepositoryService(session)
 
 
 def get_chat_service(session: Session = Depends(get_session)) -> ChatService:

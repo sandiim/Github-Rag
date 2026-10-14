@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import get_chat_service, get_repository_service
 from app.main import create_app
 from app.services.chat import ChatAnswer, CitationResult
-from app.services.repositories import ConversationSummary, MessageSummary, RebuildSummary, RepositorySummary
+from app.services.repositories import ConversationSummary, MessageSummary, RepositorySummary
 
 REPOSITORY_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -13,9 +13,9 @@ class FakeRepositoryService:
         assert repository_id == REPOSITORY_ID
         return RepositorySummary(id=repository_id, name="widgets", status="ready")
 
-    def rebuild(self, repository_id: str) -> RebuildSummary:
+    def rebuild(self, repository_id: str) -> RepositorySummary:
         assert repository_id == REPOSITORY_ID
-        return RebuildSummary(changed=True, status="ready")
+        return RepositorySummary(id=repository_id, name="widgets", status="ready")
 
     def conversation(self, repository_id: str) -> ConversationSummary:
         assert repository_id == REPOSITORY_ID
@@ -53,8 +53,9 @@ def test_repository_rebuild_conversation_and_chat_routes_return_typed_data() -> 
     conversation = client.get(f"/repositories/{REPOSITORY_ID}/conversation")
     answer = client.post(f"/repositories/{REPOSITORY_ID}/chat", json={"question": "Where is the app?"})
 
-    assert repository.json() == {"id": REPOSITORY_ID, "name": "widgets", "status": "ready"}
-    assert rebuilt.json() == {"changed": True, "status": "ready"}
+    assert repository.json() == {"id": REPOSITORY_ID, "name": "widgets", "status": "ready", "ingestion": None}
+    assert rebuilt.status_code == 202
+    assert rebuilt.json() == repository.json()
     assert conversation.json()["messages"][0]["content"] == "Where is the app?"
     assert answer.json()["citations"][0]["path"] == "src/app.py"
 
