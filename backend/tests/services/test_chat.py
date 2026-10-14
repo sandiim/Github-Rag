@@ -29,6 +29,11 @@ class StubAnswerGenerator:
         return "The application is created in src/app.py."
 
 
+class MarkedAnswerGenerator:
+    def answer(self, question: str, context: list[RetrievedChunk]) -> str:
+        return "The application is created here [1]. Unsupported marker [9]."
+
+
 def test_ask_persists_a_grounded_answer_with_commit_pinned_citation() -> None:
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
@@ -60,6 +65,26 @@ def test_ask_persists_a_grounded_answer_with_commit_pinned_citation() -> None:
         assert [citation.url for citation in citations] == [
             "https://github.com/acme/widgets/blob/abc123/src/app.py#L10-L10"
         ]
+
+
+def test_ask_persists_resolved_inline_markers_for_conversation_reload() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        repository = Repository(
+            url="https://github.com/acme/widgets", full_name="acme/widgets",
+            active_commit_sha="abc123", active_index_version=uuid.uuid4(),
+        )
+        session.add(repository)
+        session.flush()
+
+        answer = ChatService(session, StubRetriever(), MarkedAnswerGenerator()).ask(
+            repository.id, "Where is the application created?"
+        )
+
+        assert answer.text == "The application is created here [src/app.py:10-10]. Unsupported marker [9]."
+        assert [citation.path for citation in answer.citations] == ["src/app.py"]
+        assert session.scalar(select(Message).where(Message.role == "assistant")).content == answer.text
 
 
 def test_ask_rejects_a_repository_without_an_active_index() -> None:

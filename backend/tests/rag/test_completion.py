@@ -12,7 +12,8 @@ def test_completion_client_sends_grounding_context_to_openai_compatible_endpoint
         assert request.headers["authorization"] == "Bearer test-key"
         payload = json.loads(request.content)
         assert payload["model"] == "llama3.1:latest"
-        assert "src/app.py:10-10" in payload["messages"][1]["content"]
+        assert "[1] src/app.py:10-10" in payload["messages"][1]["content"]
+        assert "[1]" in payload["messages"][0]["content"]
         return httpx.Response(
             200,
             json={"choices": [{"message": {"content": "The app is created in src/app.py."}}]},

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.persistence.models import Citation, Conversation, Message, Repository
-from app.rag.citations import build_github_url
+from app.rag.citations import build_github_url, resolve_citation_markers
 from app.rag.retrieval import RetrievedChunk
 
 
@@ -78,7 +78,9 @@ class ChatService:
             )
         )
         context = self._retriever.retrieve(repository_id, question)
-        text = self._generator.answer(question, context)
+        text, used_indices = resolve_citation_markers(
+            self._generator.answer(question, context), context
+        )
         assistant_message = Message(
             conversation_id=conversation.id,
             sequence=next_sequence + 1,
@@ -88,6 +90,7 @@ class ChatService:
         self._session.add(assistant_message)
         self._session.flush()
 
+        cited_context = [context[index] for index in used_indices] if used_indices else context
         citations = [
             CitationResult(
                 path=chunk.path,
@@ -101,7 +104,7 @@ class ChatService:
                     chunk.end_line,
                 ),
             )
-            for chunk in context
+            for chunk in cited_context
         ]
         self._session.add_all(
             Citation(

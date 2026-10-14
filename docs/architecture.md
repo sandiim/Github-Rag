@@ -28,6 +28,8 @@ The file-selection policy has a version independent of the commit SHA. A manual 
 
 The file filter admits selected text suffixes, including R Markdown (`.rmd`), before chunking. Answer generation calls the local Ollama OpenAI-compatible API using the app-specific `github-rag-llama3.1:8k` alias; embeddings use `nomic-embed-text:latest` through Ollama's native API.
 
+The completion prompt labels retrieved chunks with temporary numeric source markers. Chat resolves valid markers into stable `[path:start-end]` references before persisting the answer, retaining only referenced citations when markers are present. The frontend turns references matching the message's citation records into commit-pinned inline links; an unmarked older answer keeps the separate source list.
+
 ## Core Rules
 
 - Routes call services; services own business workflows.

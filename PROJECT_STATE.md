@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. Live imports of the user's larger GitHub repositories have not yet been reverified.
+Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. Inline citation rendering is implemented; a live model answer with the new format has not yet been reverified.
 
 ## Approved Decisions
 
@@ -17,6 +17,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Completed
 
+- Added numbered source markers to the answer prompt, resolved valid markers to stable file-line spans before saving, and rendered verified links inline instead of as a trailing list. Older unmarked answers retain their existing source list.
 - Allowed R Markdown (`.rmd`/`.Rmd`) source files and raised the selection policy to version 3 so a manual rebuild can reindex an unchanged repository.
 - Added `ollama/Modelfile` with `num_ctx 8192`, created the local answer-model alias, and pointed the private `.env` and setup example at it and Ollama's local OpenAI-compatible endpoint.
 - Documented the local model setup and the context-window tradeoff in decision 0004.
@@ -57,6 +58,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Next
 
+- Restart the API and ask a new question about an indexed repository; verify that the model emits markers and links appear next to the relevant answer sections. A model response without markers will retain the legacy trailing list.
 - Restart the API to load the changed `.env`, then click Rebuild for any existing repository whose `.Rmd` file was previously omitted; verify file/chunk counts and a cited answer.
 - Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
 - Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
@@ -76,6 +78,14 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current inline-citation milestone:
+
+- `cd backend; python -m pytest -q` — 62 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 7 test files / 10 tests passed.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
+- A direct local Ollama request with one synthetic README chunk returned an inline `[1]` marker, which resolved to `[README.md:1-2]` without persisting a chat message.
+- A real repository chat answer after restarting the API has not yet been checked.
 
 Current R Markdown/context milestone:
 

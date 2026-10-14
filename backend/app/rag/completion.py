@@ -26,7 +26,8 @@ class CompletionClient:
         """Ask the configured model to answer using only retrieved source text."""
 
         context_text = "\n\n".join(
-            f"[{chunk.path}:{chunk.start_line}-{chunk.end_line}]\n{chunk.text}" for chunk in context
+            f"[{number}] {chunk.path}:{chunk.start_line}-{chunk.end_line}\n{chunk.text}"
+            for number, chunk in enumerate(context, 1)
         )
         response = self._client.post(
             "chat/completions",
@@ -37,7 +38,10 @@ class CompletionClient:
                         "role": "system",
                         "content": (
                             "Answer only from the provided repository context. "
-                            "If it is insufficient, say so plainly."
+                            "If it is insufficient, say so plainly. "
+                            "Place source markers such as [1] immediately after each supported "
+                            "paragraph or section, using only the numbered sources provided. "
+                            "Use multiple markers when needed and do not collect sources in a list at the end."
                         ),
                     },
                     {
