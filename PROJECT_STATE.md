@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. Inline citation rendering is implemented; a live model answer with the new format has not yet been reverified.
+Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. New answers use structured sections so citations can be placed inline; an end-to-end browser answer with the new format has not yet been reverified.
 
 ## Approved Decisions
 
@@ -17,6 +17,8 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Completed
 
+- Switched new completion responses from free-form citation-marker instructions to single-call JSON-schema sections with validated source IDs. Answers with no valid cited section no longer receive a trailing list of every retrieved chunk.
+- Reproduced the citation issue with the R Markdown repository: a six-chunk free-form answer omitted markers; a structured completion over the same six chunks returned cited sections.
 - Added numbered source markers to the answer prompt, resolved valid markers to stable file-line spans before saving, and rendered verified links inline instead of as a trailing list. Older unmarked answers retain their existing source list.
 - Allowed R Markdown (`.rmd`/`.Rmd`) source files and raised the selection policy to version 3 so a manual rebuild can reindex an unchanged repository.
 - Added `ollama/Modelfile` with `num_ctx 8192`, created the local answer-model alias, and pointed the private `.env` and setup example at it and Ollama's local OpenAI-compatible endpoint.
@@ -58,7 +60,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Next
 
-- Restart the API and ask a new question about an indexed repository; verify that the model emits markers and links appear next to the relevant answer sections. A model response without markers will retain the legacy trailing list.
+- Restart the API and ask a new question about an indexed repository; verify links appear beside the new answer sections. Existing saved answers without inline markers retain their historical trailing lists.
 - Restart the API to load the changed `.env`, then click Rebuild for any existing repository whose `.Rmd` file was previously omitted; verify file/chunk counts and a cited answer.
 - Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
 - Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
@@ -78,6 +80,13 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current structured-citation fix:
+
+- A read-only retrieval/completion run for `sandiim/R_analyse_multivari-e` with six chunks produced six paragraphs and valid source markers; no chat message was persisted.
+- `cd backend; python -m pytest -q` — 65 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 7 test files / 10 tests passed.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
 
 Current inline-citation milestone:
 

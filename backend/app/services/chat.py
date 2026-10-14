@@ -90,7 +90,7 @@ class ChatService:
         self._session.add(assistant_message)
         self._session.flush()
 
-        cited_context = [context[index] for index in used_indices] if used_indices else context
+        cited_context = [context[index] for index in used_indices]
         citations = [
             CitationResult(
                 path=chunk.path,
