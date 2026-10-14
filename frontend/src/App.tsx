@@ -61,6 +61,7 @@ export default function App() {
       {selected && <>
         <IngestionStatus repository={selected} onRetry={() => rebuild(selected.id)} />
         {selected.ingestion?.state !== "queued" && selected.ingestion?.state !== "running" &&
+          selected.ingestion?.state !== "failed" &&
           <RebuildButton onRebuild={() => rebuild(selected.id)} />}
       </>}
     </aside>

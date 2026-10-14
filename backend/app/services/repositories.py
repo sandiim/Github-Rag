@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.github.client import parse_repository_url
@@ -53,7 +54,7 @@ class ConversationSummary:
 
 
 class RepositoryService:
-    def __init__(self, session: Session, github: object = None, indexing: object = None) -> None:
+    def __init__(self, session: Session) -> None:
         self._session = session
 
     def create(self, url: str) -> RepositorySummary:
@@ -69,12 +70,19 @@ class RepositoryService:
             status="pending",
         )
         self._session.add(repository)
-        self._session.flush()
-        self._session.add(IngestionJob(
-            repository_id=repository.id, kind="import", state="queued",
-            created_at=datetime.now(timezone.utc),
-        ))
-        self._session.commit()
+        try:
+            self._session.flush()
+            self._session.add(IngestionJob(
+                repository_id=repository.id, kind="import", state="queued",
+                created_at=datetime.now(timezone.utc),
+            ))
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            existing = self._session.scalar(select(Repository).where(Repository.full_name == full_name))
+            if existing is None:
+                raise
+            return self._summary(existing)
         return self._summary(repository)
 
     def list(self) -> list[RepositorySummary]:
@@ -84,7 +92,11 @@ class RepositoryService:
         return self._summary(self._repository(repository_id))
 
     def rebuild(self, repository_id: str) -> RepositorySummary:
-        repository = self._repository(repository_id)
+        repository = self._session.scalar(
+            select(Repository).where(Repository.id == uuid.UUID(repository_id)).with_for_update()
+        )
+        if repository is None:
+            raise LookupError("Repository was not found")
         active = self._session.scalar(
             select(IngestionJob).where(
                 IngestionJob.repository_id == repository.id,
@@ -97,7 +109,11 @@ class RepositoryService:
             repository_id=repository.id, kind="rebuild", state="queued",
             created_at=datetime.now(timezone.utc),
         ))
-        self._session.commit()
+        try:
+            self._session.commit()
+        except IntegrityError:
+            self._session.rollback()
+            return self._summary(self._repository(repository_id))
         return self._summary(repository)
 
     def conversation(self, repository_id: str) -> ConversationSummary:

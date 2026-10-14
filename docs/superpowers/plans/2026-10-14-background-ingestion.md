@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-14-background-ingestion-design.md`
 
+**Implementation status (2026-10-14):** Tasks 1–7 were implemented in the current checkout. Deterministic SQLite/API/frontend tests and the configured PostgreSQL migration passed. Two verification items remain: exercise `SELECT ... FOR UPDATE SKIP LOCKED` with competing workers in an isolated PostgreSQL test database, and retry the user's larger GitHub repositories with the live worker after GitHub/Ollama connectivity and quota are available. The frontend has add/poll/chat-ready tests, but no browser-level Playwright test yet. See `PROJECT_STATE.md` for current counts and limitations.
+
 ## Global Constraints
 
 - Single-user local app; one separate `python -m app.worker` process and no Redis, Celery, or WebSockets.

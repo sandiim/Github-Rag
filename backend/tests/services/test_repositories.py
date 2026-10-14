@@ -21,7 +21,7 @@ def test_repository_without_messages_has_an_empty_conversation() -> None:
         session.add(repository)
         session.flush()
 
-        conversation = RepositoryService(session, github=None, indexing=None).conversation(str(repository.id))
+        conversation = RepositoryService(session).conversation(str(repository.id))
 
         assert conversation.title == "widgets"
         assert conversation.messages == []

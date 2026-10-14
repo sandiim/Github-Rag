@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-MVP implementation complete; real-repository ingestion is being hardened.
+Durable background ingestion is implemented and covered by deterministic tests. Live imports of the user's larger GitHub repositories have not yet been reverified.
 
 ## Approved Decisions
 
@@ -17,6 +17,10 @@ MVP implementation complete; real-repository ingestion is being hardened.
 
 ## Completed
 
+- Added durable queued/running/completed/failed ingestion jobs, a separate worker with leases and one automatic recovery attempt, and retryable safe errors.
+- Changed repository creation/rebuild to HTTP 202 enqueueing; the UI polls progress and keeps an existing active index chat-ready during rebuild.
+- Versioned the file-selection policy and excluded `data/` and `datasets/` before blob download.
+- Added an API-to-worker deterministic integration test and worker/job regression tests.
 - Removed the previous implementation and initialized a new Git repository on `feat/github-rag-mvp`.
 - Approved the architecture design and implementation plan.
 - Verified local tooling: Python 3.13.12, Node 24.20.0, Docker 29.1.2, Ollama 0.34.4, `llama3.1:latest`, and `nomic-embed-text:latest`.
@@ -50,7 +54,7 @@ MVP implementation complete; real-repository ingestion is being hardened.
 
 ## Next
 
-- Retry a real-repository import after the GitHub quota resets and the configured Ollama server is running; verify indexed file count and chat citations.
+- Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
 - Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
 - Add deterministic Playwright fixtures for a browser-level end-to-end workflow without requiring live GitHub or Ollama.
 
@@ -59,11 +63,24 @@ MVP implementation complete; real-repository ingestion is being hardened.
 - Private-repository access depends on the permissions of the configured GitHub token.
 - The configured GitHub token returned `x-ratelimit-remaining: 0` for a blob request from `sandiim/Score_Prediction`; live import cannot succeed until quota resets. A valid `sandiim/Turbo_Fan_RUL_Prediction` URL currently returns HTTP 429 locally.
 - The configured local Ollama endpoint at `localhost:11434` was unreachable during diagnosis, so end-to-end embedding was not verified.
+- The previously reported HTTP 422 for the Turbo_Fan URL was not reproduced from the plain URL in schema/parser tests; the exact browser request body remains unknown.
 - Fetching each selected blob via GitHub REST still spends one API request per file; bounded batches limit waste but do not remove this scalability constraint.
-- The selected pgvector Docker image must be pulled before PostgreSQL integration tests can run.
-- The current `.env` does not yet contain the optional local database and embedding settings; `.env.example` documents them.
+- The worker downloads selected blobs one at a time to expose accurate progress; large repositories may still take substantial time.
+- A stopped worker leaves imports queued; the UI will show “Waiting for worker” until it restarts. An expired running lease gets one automatic retry.
+- `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current background-ingestion milestone:
+
+- `cd backend; alembic upgrade head` — migration applied to the configured local database; `ingestion_jobs` table and new columns inspected.
+- `cd backend; alembic upgrade head; python -m pytest -q` — 57 passed, one upstream Starlette warning.
+- Plain `https://github.com/sandiim/Turbo_Fan_RUL_Prediction` passed the request-schema and URL parser in isolation; browser submission has not been reverified.
+- `cd backend; python -m pytest tests/api/test_ingestion_flow.py -q` — 1 passed, one upstream Starlette warning.
+- `cd frontend; npm test -- --run` — 6 test files / 8 tests passed, including add/poll/chat-ready behavior.
+- `cd frontend; npm run build` — TypeScript and Vite build passed.
+
+Historical earlier milestones:
 
 - `python --version` — Python 3.13.12
 - `node --version` — v24.20.0
