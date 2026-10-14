@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, synonym
 from pgvector.sqlalchemy import Vector
 
 
@@ -22,9 +22,10 @@ class Repository(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     url: Mapped[str] = mapped_column(String(2048), unique=True)
     full_name: Mapped[str] = mapped_column(String(512), unique=True)
-    default_branch: Mapped[str] = mapped_column(String(255))
+    default_branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     active_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     active_index_version: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    active_index_policy_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -81,9 +82,29 @@ class Citation(Base):
     url: Mapped[str] = mapped_column(String(4096))
 
 
-class RebuildRecord(Base):
-    __tablename__ = "rebuild_records"
+class IngestionJob(Base):
+    __tablename__ = "ingestion_jobs"
+    __table_args__ = (
+        Index(
+            "uq_ingestion_jobs_active_repository", "repository_id", unique=True,
+            postgresql_where=text("state IN ('queued', 'running')"),
+            sqlite_where=text("state IN ('queued', 'running')"),
+        ),
+    )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     repository_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repositories.id"))
     index_version: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    status: Mapped[str] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(16), default="rebuild")
+    state: Mapped[str] = mapped_column(String(32))
+    status = synonym("state")  # Compatibility until indexing no longer creates records.
+    stage: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    completed_files: Mapped[int] = mapped_column(Integer, default=0)
+    total_files: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+RebuildRecord = IngestionJob
