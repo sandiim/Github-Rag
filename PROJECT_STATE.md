@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Durable background ingestion is implemented and covered by deterministic tests. R Markdown selection and an app-specific 8K Ollama answer model are configured. New answers use structured sections so citations can be placed inline; an end-to-end browser answer with the new format has not yet been reverified.
+Hybrid active-index retrieval now combines vector and keyword candidates, with file-path weighting and result diversity. R Markdown selection, background ingestion, and structured inline-citation answers remain in place. The user reports the citation display looks better; a fresh browser end-to-end run of hybrid retrieval has not been verified here.
 
 ## Approved Decisions
 
@@ -17,6 +17,8 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Completed
 
+- Added PostgreSQL full-text candidates alongside pgvector results, with normalized file paths, path weighting, reciprocal-rank fusion, and per-file diversity before the six-chunk answer context.
+- Added deterministic ranking and query-scope tests; no migration or reindex is required for this query-only retrieval change.
 - Switched new completion responses from free-form citation-marker instructions to single-call JSON-schema sections with validated source IDs. Answers with no valid cited section no longer receive a trailing list of every retrieved chunk.
 - Reproduced the citation issue with the R Markdown repository: a six-chunk free-form answer omitted markers; a structured completion over the same six chunks returned cited sections.
 - Added numbered source markers to the answer prompt, resolved valid markers to stable file-line spans before saving, and rendered verified links inline instead of as a trailing list. Older unmarked answers retain their existing source list.
@@ -60,6 +62,8 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Next
 
+- Try code-symbol and repository-overview questions in the browser after restarting the API; inspect citation relevance and query latency on larger repositories.
+- Add a measured context-token budget before increasing the number of returned chunks.
 - Restart the API and ask a new question about an indexed repository; verify links appear beside the new answer sections. Existing saved answers without inline markers retain their historical trailing lists.
 - Restart the API to load the changed `.env`, then click Rebuild for any existing repository whose `.Rmd` file was previously omitted; verify file/chunk counts and a cited answer.
 - Start the separate worker (`cd backend; python -m app.worker`) alongside API, Vite, and PostgreSQL; retry a real-repository import and verify indexed file count and chat citations.
@@ -68,6 +72,7 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 
 ## Known Risks
 
+- Full-text ranking currently computes across the active repository's chunks and paths without a dedicated combined search index; profile larger repositories before increasing candidate counts.
 - Private-repository access depends on the permissions of the configured GitHub token.
 - The 8K context reduces GPU memory use but can truncate long prompts; retrieved-context budgeting has not been implemented.
 - The configured GitHub token returned `x-ratelimit-remaining: 0` for a blob request from `sandiim/Score_Prediction`; live import cannot succeed until quota resets. A valid `sandiim/Turbo_Fan_RUL_Prediction` URL currently returns HTTP 429 locally.
@@ -80,6 +85,12 @@ Durable background ingestion is implemented and covered by deterministic tests. 
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
+
+Current hybrid-retrieval milestone:
+
+- `cd backend; python -m pytest tests/rag/test_retrieval.py -q` — 5 passed after the query/path-weighting change.
+- Read-only PostgreSQL retrieval with real Ollama embeddings over three questions: expected file ranks were 4, 1, and 1 (all within the six returned chunks); before path normalization and weighting, the same questions ranked 6, absent, and 1.
+- `cd backend; python -m pytest -q` — 70 passed, one upstream Starlette warning after the final SQL-path adjustment.
 
 Current structured-citation fix:
 

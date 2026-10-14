@@ -30,6 +30,8 @@ The file filter admits selected text suffixes, including R Markdown (`.rmd`), be
 
 The completion adapter labels retrieved chunks with temporary numeric source IDs and requests schema-constrained sections containing paragraph text plus supporting IDs. It accepts only IDs from the supplied context and formats them as markers beside each paragraph. Chat resolves those markers into stable `[path:start-end]` references before persisting the answer and retains only referenced citations. The frontend turns references matching the message's citation records into commit-pinned inline links; an unmarked older answer keeps the separate source list.
 
+Retrieval searches only the repository's active index version. It takes vector-nearest candidates and PostgreSQL full-text candidates from chunk text plus normalized, more heavily weighted file paths. Reciprocal-rank fusion combines the candidate lists, deduplicates identical spans, and favors at most two chunks per file before filling any remaining slots. The chat interface still receives up to six retrieved chunks; no reindex is required for this query-only change.
+
 ## Core Rules
 
 - Routes call services; services own business workflows.
