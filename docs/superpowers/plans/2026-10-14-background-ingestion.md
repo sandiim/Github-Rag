@@ -61,7 +61,7 @@
       }
   ```
 - [ ] Run `cd backend; python -m pytest tests/persistence/test_ingestion_schema.py -q`; expected: import/metadata assertion failure.
-- [ ] Add the model fields and Alembic `0004` migration: rename `rebuild_records` to `ingestion_jobs`, rename `status` to `state`, add the listed fields, backfill historical kind as `rebuild` and attempt count as `0`, mark historical `running` rows `failed`, and create `uq_ingestion_jobs_active_repository` with predicate `state IN ('queued','running')`. Alter `repositories.default_branch` nullable and add nullable `active_index_policy_version`. The model's partial index must define both `postgresql_where` and `sqlite_where` so SQLite unit tests enforce the same rule.
+- [ ] Add the model fields and Alembic `0004` migration: rename `rebuild_records` to `ingestion_jobs`, rename `status` to `state`, add the listed fields, backfill historical kind as `rebuild` and attempt count as `0`, mark historical `running` rows `failed`, and create `uq_ingestion_jobs_active_repository` with predicate `state IN ('queued','running')`. Alter `repositories.default_branch` nullable and add nullable `active_index_policy_version`. The model's partial index must define both `postgresql_where` and `sqlite_where` so SQLite unit tests enforce the same rule. Until Task 4 removes the old indexing-side record creation, keep `RebuildRecord = IngestionJob` and a mapped `status` synonym for `state` so each intermediate commit remains testable.
 
   ```python
   op.rename_table("rebuild_records", "ingestion_jobs")
