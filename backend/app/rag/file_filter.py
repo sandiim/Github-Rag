@@ -4,7 +4,9 @@ from pathlib import PurePosixPath
 
 MAX_FILE_BYTES = 500_000
 ALLOWED_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx", ".md", ".json", ".yaml", ".yml", ".toml"}
-EXCLUDED_DIRECTORIES = {".git", "node_modules", "dist", "build", "coverage", ".venv", "vendor"}
+EXCLUDED_DIRECTORIES = {
+    ".git", "node_modules", "dist", "build", "coverage", ".venv", "venv", "vendor", "mlruns",
+}
 EXCLUDED_FILENAMES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock"}
 
 

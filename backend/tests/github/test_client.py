@@ -4,7 +4,7 @@ import time
 import pytest
 import httpx
 
-from app.github.client import GitHubClient, InvalidRepositoryUrl, parse_repository_url
+from app.github.client import GitHubClient, GitHubRateLimitError, InvalidRepositoryUrl, parse_repository_url
 from app.github.models import GitHubRepository, RepositoryReference
 
 
@@ -85,6 +85,8 @@ def test_list_files_skips_non_indexable_tree_entries_before_downloading_blobs() 
                 json={
                     "tree": [
                         {"type": "blob", "path": "package-lock.json", "sha": "ignored"},
+                        {"type": "blob", "path": "venv/Lib/site-packages/pkg/module.py", "sha": "venv"},
+                        {"type": "blob", "path": "mlruns/1/metadata.json", "sha": "mlruns"},
                         {"type": "blob", "path": "src/app.py", "sha": "included"},
                     ]
                 },
@@ -141,3 +143,56 @@ def test_list_files_downloads_candidate_blobs_concurrently() -> None:
 
     assert len(files) == 4
     assert maximum_active > 1
+
+
+def test_list_files_reports_exhausted_github_quota() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/git/trees/abc123"):
+            return httpx.Response(
+                200,
+                json={"tree": [{"type": "blob", "path": "src/app.py", "sha": "blob-1"}]},
+            )
+        return httpx.Response(
+            403,
+            headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": "1792015200"},
+            json={"message": "API rate limit exceeded"},
+        )
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    repository = GitHubRepository(
+        reference=RepositoryReference(owner="acme", name="widgets"),
+        default_branch="main",
+        commit_sha="abc123",
+    )
+
+    with pytest.raises(GitHubRateLimitError, match="GitHub API rate limit"):
+        client.list_files(repository)
+
+
+def test_list_files_stops_scheduling_blobs_after_rate_limit() -> None:
+    requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        if request.url.path.endswith("/git/trees/abc123"):
+            return httpx.Response(
+                200,
+                json={"tree": [
+                    {"type": "blob", "path": f"src/{number}.py", "sha": f"blob-{number}"}
+                    for number in range(20)
+                ]},
+            )
+        requests += 1
+        return httpx.Response(403, headers={"x-ratelimit-remaining": "0"})
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    repository = GitHubRepository(
+        reference=RepositoryReference(owner="acme", name="widgets"),
+        default_branch="main",
+        commit_sha="abc123",
+    )
+
+    with pytest.raises(GitHubRateLimitError):
+        client.list_files(repository)
+
+    assert requests <= 8

@@ -10,7 +10,14 @@ def test_allowlisted_text_files_are_indexed(path: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["node_modules/a.js", "dist/app.min.js", "package-lock.json", ".git/config"],
+    [
+        "node_modules/a.js",
+        "dist/app.min.js",
+        "package-lock.json",
+        ".git/config",
+        "venv/Lib/site-packages/pkg/module.py",
+        "mlruns/1/metadata.json",
+    ],
 )
 def test_generated_or_dependency_files_are_excluded(path: str) -> None:
     assert should_index(path, "meaningful text") is False

@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-MVP implementation complete — end-to-end fixture automation remains next.
+MVP implementation complete; real-repository ingestion is being hardened.
 
 ## Approved Decisions
 
@@ -42,14 +42,24 @@ MVP implementation complete — end-to-end fixture automation remains next.
 - Added responsive two-pane styling and frontend component tests for repository selection and citation rendering.
 - Documented the verified local startup sequence and configured Vite to proxy API requests to FastAPI during development.
 - Recorded the PostgreSQL/pgvector and full-versioned-rebuild architecture decisions.
+- Excluded committed `venv/` environments and `mlruns/` generated artifacts before GitHub blob downloads and chunking.
+- Bounded GitHub blob download scheduling to batches of eight, stopping further batches on rate-limit failure.
+- Mapped GitHub primary rate-limit responses to HTTP 429 with the reset time instead of an opaque 500.
+- Narrowed HTTP 422 mapping to invalid repository URLs; other indexing `ValueError`s no longer masquerade as URL errors.
+- Increased the local Ollama embedding read timeout and displayed import/validation errors in the web form.
 
 ## Next
 
+- Retry a real-repository import after the GitHub quota resets and the configured Ollama server is running; verify indexed file count and chat citations.
+- Decide whether to replace one-blob-per-file GitHub fetching with an archive-based or partial-clone strategy for repositories with hundreds or thousands of useful source files.
 - Add deterministic Playwright fixtures for a browser-level end-to-end workflow without requiring live GitHub or Ollama.
 
 ## Known Risks
 
 - Private-repository access depends on the permissions of the configured GitHub token.
+- The configured GitHub token returned `x-ratelimit-remaining: 0` for a blob request from `sandiim/Score_Prediction`; live import cannot succeed until quota resets. A valid `sandiim/Turbo_Fan_RUL_Prediction` URL currently returns HTTP 429 locally.
+- The configured local Ollama endpoint at `localhost:11434` was unreachable during diagnosis, so end-to-end embedding was not verified.
+- Fetching each selected blob via GitHub REST still spends one API request per file; bounded batches limit waste but do not remove this scalability constraint.
 - The selected pgvector Docker image must be pulled before PostgreSQL integration tests can run.
 - The current `.env` does not yet contain the optional local database and embedding settings; `.env.example` documents them.
 
@@ -65,5 +75,8 @@ MVP implementation complete — end-to-end fixture automation remains next.
 - `cd backend; alembic upgrade head; python -m pytest -q` — 25 passed (one upstream Starlette deprecation warning)
 - `cd backend; python -m pytest -q` — 29 passed (one upstream Starlette deprecation warning)
 - `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
+- `cd backend; python -m pytest -q` — 44 passed (one upstream Starlette deprecation warning) after ingestion hardening.
+- `cd frontend; npm test -- --run` — 4 test files / 4 tests passed after error-display changes.
+- `cd frontend; npm run build` — production build passed after error-display changes.
 - `cd frontend; npm test -- --run; npm run build` — 2 tests passed; production build passed
 - `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)

@@ -13,7 +13,11 @@ class EmbeddingClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._model = model
-        self._client = httpx.Client(base_url=base_url, transport=transport)
+        self._client = httpx.Client(
+            base_url=base_url,
+            transport=transport,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed text in order using Ollama's batch embedding endpoint."""

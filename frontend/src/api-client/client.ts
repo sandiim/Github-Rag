@@ -3,6 +3,14 @@ import type { Citation, Conversation, Repository } from "../types/api";
 type ApiCitation = { path: string; start_line: number; end_line: number; url: string };
 type ApiMessage = { role: "user" | "assistant"; content: string; citations: ApiCitation[] };
 
+function errorDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(item => typeof item?.msg === "string" ? item.msg : "Invalid request").join("; ");
+  }
+  return "Request failed";
+}
+
 const toCitation = (citation: ApiCitation): Citation => ({
   path: citation.path, startLine: citation.start_line, endLine: citation.end_line, url: citation.url
 });
@@ -34,7 +42,10 @@ export class ApiClient {
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers: { "Content-Type": "application/json", ...init.headers } });
-    if (!response.ok) throw new Error((await response.json().catch(() => ({ detail: "Request failed" }))).detail);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: "Request failed" }));
+      throw new Error(errorDetail(body.detail));
+    }
     return response.json() as Promise<T>;
   }
 }

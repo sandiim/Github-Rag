@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_chat_service, get_repository_service
+from app.github.client import GitHubRateLimitError, InvalidRepositoryUrl
 from app.api.schemas import (
     ChatRequest, ChatResponse, CitationResponse, ConversationResponse, CreateRepositoryRequest,
     MessageResponse, RebuildResponse, RepositoryResponse,
@@ -20,7 +21,9 @@ def create_repository(
 ) -> RepositoryResponse:
     try:
         return _repository_response(service.create(str(request.url)))
-    except ValueError as error:
+    except GitHubRateLimitError as error:
+        raise HTTPException(status_code=429, detail=str(error)) from error
+    except InvalidRepositoryUrl as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -47,6 +50,8 @@ def get_repository(repository_id: str, service: RepositoryService = Depends(get_
 def rebuild_repository(repository_id: str, service: RepositoryService = Depends(get_repository_service)) -> RebuildResponse:
     try:
         result = service.rebuild(repository_id)
+    except GitHubRateLimitError as error:
+        raise HTTPException(status_code=429, detail=str(error)) from error
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     return RebuildResponse(changed=result.changed, status=result.status)
