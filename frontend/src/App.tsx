@@ -17,6 +17,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [streaming, setStreaming] = useState<StreamingState | null>(null);
   const [conversationLoading, setConversationLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const activeStream = useRef<AbortController | null>(null);
   const currentRepository = useRef<string | null>(null);
   const waitTimer = useRef<number | null>(null);
@@ -49,6 +50,7 @@ export default function App() {
     setMessages([]);
     setSelectedId(id);
     setConversationLoading(true);
+    setSidebarOpen(false);
     try {
       const conversation = await api.conversation(id);
       if (currentRepository.current === id) setMessages(conversation.messages);
@@ -67,76 +69,110 @@ export default function App() {
     setRepositories(current => current.map(repository => repository.id === id ? updated : repository));
   };
 
-  return <div className="app">
-    <aside>
-      <RepositorySidebar repositories={repositories} selectedRepositoryId={selectedId} onSelect={select} />
-      <AddRepositoryForm onAdd={async url => {
-        const repository = await api.addRepository(url);
-        setRepositories(current => current.some(item => item.id === repository.id)
-          ? current.map(item => item.id === repository.id ? repository : item)
-          : [...current, repository]);
-        await select(repository.id);
-      }} />
-      {selected && <>
-        <IngestionStatus repository={selected} onRetry={() => rebuild(selected.id)} />
-        {selected.ingestion?.state !== "queued" && selected.ingestion?.state !== "running" &&
-          selected.ingestion?.state !== "failed" &&
-          <RebuildButton onRebuild={() => rebuild(selected.id)} />}
-      </>}
-    </aside>
-    <ChatPanel repository={selected} messages={messages} streaming={streaming}
-      conversationLoading={conversationLoading} onSend={async question => {
-      if (!selected) return;
-      if (activeStream.current) return;
-      const repositoryId = selected.id;
-      const controller = new AbortController();
-      activeStream.current = controller;
-      setError("");
-      setMessages(current => [...current, { role: "user", content: question, citations: [] }]);
-      setMessages(current => [...current, { role: "assistant", content: "", citations: [] }]);
-      setStreaming({ stage: "retrieving", waiting: true });
-      try {
-        await api.askStream(repositoryId, question, event => {
-          if (activeStream.current !== controller) return;
-          if (event.type === "status") {
-            setStreaming({ stage: event.stage, waiting: true });
-          } else if (event.type === "delta") {
-            setMessages(current => current.map((message, index) => index === current.length - 1
-              ? { ...message, content: message.content + event.text } : message));
-            setStreaming({ stage: "generating", waiting: false });
-            if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
-            waitTimer.current = window.setTimeout(() => {
-              if (activeStream.current === controller) setStreaming({ stage: "generating", waiting: true });
-            }, 650);
-          } else if (event.type === "checkpoint" || event.type === "complete") {
-            setMessages(current => current.map((message, index) => index === current.length - 1
-              ? { ...message, content: event.text, citations: event.citations } : message));
-            if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
-            if (event.type === "complete") {
-              setStreaming(null);
-              activeStream.current = null;
-            } else {
-              setStreaming({ stage: "generating", waiting: true });
-            }
-          } else if (event.type === "error") {
-            throw new Error(event.message);
-          }
-        }, controller.signal);
-      } catch (failure) {
-        if (activeStream.current !== controller) return;
-        activeStream.current = null;
-        if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
-        setStreaming(null);
-        setError((failure as Error).message);
+  return (
+    <div className="app">
+      <button 
+        className="sidebar-toggle" 
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle sidebar"
+      >
+        {sidebarOpen ? "✕" : "☰"}
+      </button>
+      <aside className={sidebarOpen ? "open" : ""}>
+        <div className="sidebar-header">
+          <h1>Repository RAG</h1>
+        </div>
+
+        <div className="sidebar-section">
+          <h2 className="section-title">Repositories</h2>
+          <RepositorySidebar 
+            repositories={repositories} 
+            selectedRepositoryId={selectedId} 
+            onSelect={select} 
+          />
+        </div>
+
+        <div className="sidebar-section">
+          <h2 className="section-title">Add New</h2>
+          <AddRepositoryForm onAdd={async url => {
+            const repository = await api.addRepository(url);
+            setRepositories(current => current.some(item => item.id === repository.id)
+              ? current.map(item => item.id === repository.id ? repository : item)
+              : [...current, repository]);
+            await select(repository.id);
+          }} />
+        </div>
+
+        {selected && (
+          <div className="sidebar-section repo-controls">
+            <h2 className="section-title">Index Status</h2>
+            <IngestionStatus repository={selected} onRetry={() => rebuild(selected.id)} />
+            {selected.ingestion?.state !== "queued" && 
+             selected.ingestion?.state !== "running" &&
+             selected.ingestion?.state !== "failed" && (
+              <RebuildButton onRebuild={() => rebuild(selected.id)} />
+            )}
+          </div>
+        )}
+      </aside>
+      <ChatPanel 
+        repository={selected} 
+        messages={messages} 
+        streaming={streaming}
+        conversationLoading={conversationLoading} 
+        onSend={async question => {
+        if (!selected) return;
+        if (activeStream.current) return;
+        const repositoryId = selected.id;
+        const controller = new AbortController();
+        activeStream.current = controller;
+        setError("");
+        setMessages(current => [...current, { role: "user", content: question, citations: [] }]);
+        setMessages(current => [...current, { role: "assistant", content: "", citations: [] }]);
+        setStreaming({ stage: "retrieving", waiting: true });
         try {
-          const saved = await api.conversation(repositoryId);
-          if (currentRepository.current === repositoryId) setMessages(saved.messages);
-        } catch {
-          if (currentRepository.current === repositoryId) setMessages(current => current.slice(0, -2));
+          await api.askStream(repositoryId, question, event => {
+            if (activeStream.current !== controller) return;
+            if (event.type === "status") {
+              setStreaming({ stage: event.stage, waiting: true });
+            } else if (event.type === "delta") {
+              setMessages(current => current.map((message, index) => index === current.length - 1
+                ? { ...message, content: message.content + event.text } : message));
+              setStreaming({ stage: "generating", waiting: false });
+              if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+              waitTimer.current = window.setTimeout(() => {
+                if (activeStream.current === controller) setStreaming({ stage: "generating", waiting: true });
+              }, 650);
+            } else if (event.type === "checkpoint" || event.type === "complete") {
+              setMessages(current => current.map((message, index) => index === current.length - 1
+                ? { ...message, content: event.text, citations: event.citations } : message));
+              if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+              if (event.type === "complete") {
+                setStreaming(null);
+                activeStream.current = null;
+              } else {
+                setStreaming({ stage: "generating", waiting: true });
+              }
+            } else if (event.type === "error") {
+              throw new Error(event.message);
+            }
+          }, controller.signal);
+        } catch (failure) {
+          if (activeStream.current !== controller) return;
+          activeStream.current = null;
+          if (waitTimer.current !== null) window.clearTimeout(waitTimer.current);
+          setStreaming(null);
+          setError((failure as Error).message);
+          try {
+            const saved = await api.conversation(repositoryId);
+            if (currentRepository.current === repositoryId) setMessages(saved.messages);
+          } catch {
+            if (currentRepository.current === repositoryId) setMessages(current => current.slice(0, -2));
+          }
+          throw failure;
         }
-        throw failure;
-      }
-    }} />
-    {error && <p role="alert">{error}</p>}
-  </div>;
+      }} />
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
 }

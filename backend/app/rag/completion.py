@@ -43,6 +43,7 @@ class CompletionClient:
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_key}"},
             transport=transport,
+            timeout=httpx.Timeout(180.0, connect=10.0),
         )
 
     def answer(self, question: str, context: list[RetrievedChunk]) -> str:

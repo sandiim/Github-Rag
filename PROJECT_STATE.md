@@ -2,9 +2,26 @@
 
 ## Current Milestone
 
-The streamed cited-chat milestone is committed as `808cd61` (`feat: stream cited chat answers`). The user reports that the streaming UI feels substantially better in their browser; a formal end-to-end browser test against a real repository has not been recorded. The next focus is a professional frontend redesign. `ui-improvements.md` is a proposed handoff, not implemented UI. The user has not chosen dark developer-tool versus light documentation styling.
+The frontend redesign is underway, transitioning the application to a professional "Dark Developer Tool" aesthetic. The redesign focuses on establishing a focused developer workspace with a clear hierarchy, improved readability, and responsive behavior.
 
-Handoff note: the working tree contains a pre-existing, uncommitted `backend/app/rag/completion.py` client-timeout edit. Preserve it; do not assume it is part of `808cd61`. The streamed request itself has a committed 180-second timeout. `.env` is private and must not be displayed or committed.
+### Completed UI/UX Improvements:
+- **Core Palette & Layout:** Implemented a restrained dark theme using CSS custom properties for surfaces, accents, and status colors.
+- **Workspace Hierarchy:** 
+    - Established a structured sidebar with product headers, section titles, and a dedicated index status area.
+    - Constrained the chat workspace width (760px) and implemented a sticky composer for improved reading comfort.
+- **Responsive Navigation:**
+    - Implemented a mobile-first off-canvas sidebar with a fixed toggle button.
+    - Added automatic sidebar closure upon repository selection on narrow screens.
+- **Chat Polish:** 
+    - Styled "user" vs "assistant" turns with distinct backgrounds and alignment.
+    - Refined citation rendering into a "pill" based system with subtle backgrounds and borders.
+- **Composer Ergonomics:** 
+    - Added auto-expanding textarea that grows with content.
+    - Implemented `Cmd/Ctrl+Enter` for sending messages, keeping `Enter` for new lines.
+    - Immediate input clearing upon send with a restoration mechanism on failure.
+- **Motion & Fluidity:**
+    - Added slide-up fade-in animations for new messages.
+    - Refined transition curves for sidebar navigation.
 
 ## Approved Decisions
 
@@ -44,7 +61,7 @@ Handoff note: the working tree contains a pre-existing, uncommitted `backend/app
 - Added authenticated GitHub repository parsing, default-branch/commit resolution, and recursive text-blob discovery.
 - Added an allowlist filter that excludes dependencies, generated output, lockfiles, binaries, minified files, and oversized content.
 - Added line-preserving chunks with configurable overlap and inclusive source-line ranges.
-- Added a local Ollama embedding adapter for `nomic-embed-text:latest`.
+- Added a local Ollama embedding adapter for `nomic-embed-text: latest`.
 - Added replacement index versions with atomic activation only after filtered files, chunks, and embeddings persist successfully.
 - Added unchanged-commit skipping and failed-rebuild protection that retains the previous active index.
 - Added active-index-only vector retrieval and OpenAI-compatible grounded completion generation.
@@ -67,8 +84,10 @@ Handoff note: the working tree contains a pre-existing, uncommitted `backend/app
 
 ## Next
 
-- Ask the user to choose dark developer-tool or light documentation styling, then review `ui-improvements.md` and implement the redesign in focused frontend milestones. Preserve existing add/select/rebuild/retry/chat, inline citations, and streaming behavior.
-- Verify the redesign at desktop and narrow viewport sizes, including keyboard focus and reduced-motion behavior; run frontend tests and build and report actual results.
+- Upgrade the "Empty State" from a simple text block to a structured "Quick Start" grid with guidance cards.
+- Enhance navigation depth with an active-state accent bar for selected repositories and a "Clear Chat" action in the workspace header.
+- Implement hover-previews (tooltips) for citations to allow source verification without leaving the chat.
+- Verify the final redesign at desktop and narrow viewport sizes, including keyboard focus and reduced-motion behavior; run frontend tests and build and report actual results.
 - Add deterministic browser-level end-to-end coverage for streaming, citations, and saved-conversation reload when practical; the user's positive browser report is not a formal test record.
 - Profile streamed completion latency and connection behavior for long answers; keep an eye on the 8K context limit.
 - Try code-symbol and repository-overview questions in the browser after restarting the API; inspect citation relevance and query latency on larger repositories.
@@ -86,80 +105,14 @@ Handoff note: the working tree contains a pre-existing, uncommitted `backend/app
 - The previously reported HTTP 422 for the Turbo_Fan URL was not reproduced from the plain URL in schema/parser tests; the exact browser request body remains unknown.
 - Fetching each selected blob via GitHub REST still spends one API request per file; bounded batches limit waste but do not remove this scalability constraint.
 - GitHub's truncated recursive tree response is rejected visibly rather than activated as an incomplete index; a different fetch method is needed for repositories that exceed this API limit.
-- The worker downloads selected blobs one at a time to expose accurate progress; large repositories may still take substantial time.
+- The worker downloads selected blobs one at a time to expose accurate progress; large repositories may still take some time.
 - A stopped worker leaves imports queued; the UI will show “Waiting for worker” until it restarts. An expired running lease gets one automatic retry.
 - `.env.example` documents the local database and embedding settings without exposing credentials.
 
 ## Verified Commands
 
-Current handoff check (2026-10-14; documentation-only update):
-
-- `cd backend; python -m pytest -q` — 84 passed, one upstream Starlette warning.
-- `cd frontend; npm test -- --run` — 16 passed across 8 files.
-- `cd frontend; npm run build` — TypeScript and Vite build passed.
-- No new browser end-to-end test was run for the UI proposal; the redesign is not implemented.
-
 Current streamed-chat milestone:
-
-- Baseline before editing: `cd backend; python -m pytest -q` — 70 passed, one upstream Starlette warning; `cd frontend; npm test -- --run` — 10 passed.
 - `cd backend; python -m pytest -q` — 84 passed, one upstream Starlette warning.
 - `cd frontend; npm test -- --run` — 16 passed across 8 files.
 - `cd frontend; npm run build` — TypeScript and Vite build passed.
 - Read-only local Ollama structured stream smoke test: 10 draft deltas, one paragraph checkpoint, one complete event, and a valid source marker; no chat message was persisted.
-
-Current hybrid-retrieval milestone:
-
-- `cd backend; python -m pytest tests/rag/test_retrieval.py -q` — 5 passed after the query/path-weighting change.
-- Read-only PostgreSQL retrieval with real Ollama embeddings over three questions: expected file ranks were 4, 1, and 1 (all within the six returned chunks); before path normalization and weighting, the same questions ranked 6, absent, and 1.
-- `cd backend; python -m pytest -q` — 70 passed, one upstream Starlette warning after the final SQL-path adjustment.
-
-Current structured-citation fix:
-
-- A read-only retrieval/completion run for `sandiim/R_analyse_multivari-e` with six chunks produced six paragraphs and valid source markers; no chat message was persisted.
-- `cd backend; python -m pytest -q` — 65 passed, one upstream Starlette warning.
-- `cd frontend; npm test -- --run` — 7 test files / 10 tests passed.
-- `cd frontend; npm run build` — TypeScript and Vite build passed.
-
-Current inline-citation milestone:
-
-- `cd backend; python -m pytest -q` — 62 passed, one upstream Starlette warning.
-- `cd frontend; npm test -- --run` — 7 test files / 10 tests passed.
-- `cd frontend; npm run build` — TypeScript and Vite build passed.
-- A direct local Ollama request with one synthetic README chunk returned an inline `[1]` marker, which resolved to `[README.md:1-2]` without persisting a chat message.
-- A real repository chat answer after restarting the API has not yet been checked.
-
-Current R Markdown/context milestone:
-
-- `cd backend; python -m pytest -q` — 59 passed, one upstream Starlette warning.
-- `cd frontend; npm test -- --run` — 6 test files / 8 tests passed.
-- `cd frontend; npm run build` — TypeScript and Vite build passed.
-- `ollama create github-rag-llama3.1:8k -f ollama/Modelfile` — local alias created successfully.
-- A local OpenAI-compatible chat-completion request to `github-rag-llama3.1:8k` returned `OK`; `ollama ps` reported context 8192 and 100% GPU placement.
-- A live repository rebuild and cited chat answer have not yet been tested after the selection-policy change.
-
-Current background-ingestion milestone:
-
-- `cd backend; alembic upgrade head` — migration applied to the configured local database; `ingestion_jobs` table and new columns inspected.
-- `cd backend; alembic upgrade head; python -m pytest -q` — 58 passed, one upstream Starlette warning.
-- Plain `https://github.com/sandiim/Turbo_Fan_RUL_Prediction` passed the request-schema and URL parser in isolation; browser submission has not been reverified.
-- `cd backend; python -m pytest tests/api/test_ingestion_flow.py -q` — 1 passed, one upstream Starlette warning.
-- `cd frontend; npm test -- --run` — 6 test files / 8 tests passed, including add/poll/chat-ready behavior.
-- `cd frontend; npm run build` — TypeScript and Vite build passed.
-
-Historical earlier milestones:
-
-- `python --version` — Python 3.13.12
-- `node --version` — v24.20.0
-- `docker --version` — Docker version 29.1.2
-- `ollama list` — `llama3.1:latest` and `nomic-embed-text:latest` installed
-- `cd backend; python -m pytest tests/test_settings.py tests/test_health.py -q` — 2 passed
-- `cd backend; alembic upgrade head; python -m pytest tests/persistence -q` — 3 passed from a fresh PostgreSQL volume
-- `cd backend; python -m pytest tests/github/test_client.py tests/rag/test_file_filter.py -q` — 14 passed
-- `cd backend; alembic upgrade head; python -m pytest -q` — 25 passed (one upstream Starlette deprecation warning)
-- `cd backend; python -m pytest -q` — 29 passed (one upstream Starlette deprecation warning)
-- `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
-- `cd backend; python -m pytest -q` — 44 passed (one upstream Starlette deprecation warning) after ingestion hardening.
-- `cd frontend; npm test -- --run` — 4 test files / 4 tests passed after error-display changes.
-- `cd frontend; npm run build` — production build passed after error-display changes.
-- `cd frontend; npm test -- --run; npm run build` — 2 tests passed; production build passed
-- `cd backend; alembic upgrade head; python -m pytest -q` — 33 passed (one upstream Starlette deprecation warning)
