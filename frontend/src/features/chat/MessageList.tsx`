@@ -1,0 +1,170 @@
+import { useState, useEffect, useRef } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+import type { Citation, Message } from "../../types/api";
+import { CitationList } from "./CitationList";
+
+export type StreamingState = { stage: "retrieving" | "generating"; waiting: boolean };
+
+const sourceMarker = /\[([^\[\]\r\n]+):(\d+)-(\d+)\]/g;
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button className="code-copy-btn" onClick={handleCopy} title="Copy code">
+      {copied ? "✓" : "📋"}
+    </button>
+  );
+}
+
+export function MessageList({ 
+  messages, 
+  streaming = null 
+}: { 
+  messages: Message[]; 
+  streaming?: StreamingState | null;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!scrollRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowJumpToBottom(!isAtBottom);
+    };
+
+    const container = scrollRef.current;
+    container?.addEventListener("scroll", handleScroll);
+    return () => container?.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const jumpToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    setShowJumpToBottom(false);
+  };
+
+  const renderContent = (message: Message) => {
+    if (message.role === "user") return <p>{message.content}</p>;
+
+    // Custom renderer for Markdown to handle Citations as interactive links
+    return (
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p>{children}</p>,
+          code({ node, inline, className, children, ...props }: any) {
+            const match = className?.replace("language-", "");
+            const content = String(children).replace(/\n$/, "");
+
+            if (inline) {
+              return <code className="inline-code" {...props}>{children}</code>;
+            }
+
+            return (
+              <div className="code-block-container">
+                <div className="code-header">
+                  <span className="code-lang">{match || "text"}</span>
+                  <CopyButton text={content} />
+                </div>
+                <SyntaxHighlighter 
+                  style={oneDark} 
+                  language={match || "text"} 
+                  PreTag="div" 
+                  customStyle={{ margin: 0, padding: "1rem", fontSize: "0.875rem" }}
+                  {...props}
+                >
+                  {content}
+                </SyntaxHighlighter>
+              </div>
+            );
+          },
+          // Intercept the specific source markers [path:start-end]
+          text: ({ value }) => {
+            const parts: ReactNode[] = [];
+            let lastIndex = 0;
+            
+            for (const match of value.matchAll(sourceMarker)) {
+              const citation = message.citations.find(c => 
+                c.path === match[1] && c.startLine === Number(match[2]) && c.endLine === Number(match[3])
+              );
+
+              parts.push(value.slice(lastIndex, match.index));
+              if (citation) {
+                parts.push(
+                  <a 
+                    key={match.index} 
+                    href={citation.url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="citation-link"
+                  >
+                    {match[0]}
+                  </a>
+                );
+              } else {
+                parts.push(match[0]);
+              }
+              lastIndex = match.index + match[0].length;
+            }
+            parts.push(value.slice(lastIndex));
+            return <>{parts}</>;
+          }
+        }}
+      >
+        {message.content}
+      </ReactMarkdown>
+    );
+  };
+
+  return (
+    <section 
+      className="messages-viewport" 
+      ref={scrollRef} 
+      aria-live={streaming ? "off" : "polite"}
+    >
+      <div className="messages-content">
+        {messages.map((message, index) => {
+          const active = streaming && index === messages.length - 1 && message.role === "assistant";
+          const status = streaming?.stage === "retrieving" ? "Searching repository" :
+            message.content ? "Waiting for more" : "Preparing answer";
+          
+          return (
+            <div className={`message-group ${message.role}`} key={`${message.role}-${index}`}>
+              <article className="bubble">
+                {renderContent(message)}
+                {message.role === "assistant" && 
+                 !message.content.includes("[") && // Simple check to see if inline citations were used
+                 message.citations.length > 0 && (
+                  <CitationList citations={message.citations} />
+                )}
+                {active && (
+                  <span className={`stream-status${streaming?.waiting ? "" : " is-idle"}`} role="status">
+                    <span className="stream-dots" aria-hidden="true"><i /><i /><i /></span>
+                    {status}
+                  </span>
+                )}
+              </article>
+            </div>
+          );
+        })}
+      </div>
+      {showJumpToBottom && (
+        <button className="jump-to-bottom" onClick={jumpToBottom}>
+          <span>↓</span> Jump to latest
+        </button>
+      )}
+    </section>
+  );
+}

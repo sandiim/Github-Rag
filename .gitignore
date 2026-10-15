@@ -13,3 +13,4 @@ playwright-report/
 test-results/
 .superpowers/
 postgres_data/
+*.md

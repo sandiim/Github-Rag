@@ -35,7 +35,7 @@ export function ChatComposer({ disabled, onSend }: {
           setQuestion(currentQuestion);
         }
       }}>
-        <label>Ask about this repository
+        <div className="input-container">
           <textarea 
             ref={textareaRef}
             aria-label="Ask about this repository" 
@@ -45,9 +45,18 @@ export function ChatComposer({ disabled, onSend }: {
             onChange={event => setQuestion(event.target.value)} 
             onKeyDown={handleKeyDown}
             rows={1}
+            placeholder="Ask about this repository..."
           />
-        </label>
-        <button disabled={disabled || !question.trim()}>Send</button>
+          <button 
+            className="send-button" 
+            disabled={disabled || !question.trim()}
+            type="submit"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 11L12 6L17 11M12 18V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </form>
     </div>
   );
